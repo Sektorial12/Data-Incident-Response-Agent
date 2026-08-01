@@ -21,15 +21,31 @@ MTTR: ~45 seconds vs ~4 hours manual.
 
 ## Architecture
 
+```mermaid
+graph TD
+    A[DataHub Assertion Failure] -->|Kafka Event| B[DataHub Actions Plugin]
+    B -->|IncidentEvent| C[Coordinator Agent]
+    C -->|dispatch| D[Tracer Agent]
+    D -->|get_lineage UPSTREAM| DH[(DataHub MCP)]
+    D -->|candidates| C
+    C -->|validate| E[Checker Agent]
+    E -->|get_entities, search| DH
+    E -->|validated candidates| C
+    C -->|notify| F[Notifier Agent]
+    F -->|HTTP POST| S[Slack]
+    C -->|report| G[Reporter Agent]
+    G -->|save_document, add_tags| DH
+    G -->|document URN| C
+    C -->|final summary| OUT[Incident Response Complete]
 ```
-DataHub Assertion Failure (Kafka Event)
-    → DataHub Actions Plugin (event filter)
-    → Coordinator Agent (orchestration)
-        → Tracer Agent (lineage traversal, root cause identification)
-        → Checker Agent (hypothesis validation)
-        → Notifier Agent (Slack alert)
-        → Reporter Agent (incident report → DataHub write-back)
-```
+
+## Agent Topology
+
+- **Coordinator** — Orchestrates the pipeline, dispatches to sub-agents, aggregates results
+- **Tracer** — Retrieves upstream lineage (up to 3 hops), evaluates each node for root cause indicators (failed assertions, schema changes, freshness issues), returns ranked candidates with confidence scores
+- **Checker** — Validates each candidate by examining metadata, checking for failed assertions, schema modifications, and related documents. Returns confirmed/probable/rejected status
+- **Notifier** — Formats a Slack alert with dataset name, assertion details, root cause candidates, confidence scores, and DataHub UI link
+- **Reporter** — Generates a markdown incident report (summary, root cause analysis, lineage path, recommended actions) and writes it back to DataHub as a document. Tags root cause datasets
 
 ## DataHub Capabilities Used
 
@@ -77,6 +93,27 @@ docker-compose up -d
 5. Checker agent validates hypothesis
 6. Slack alert sent with root cause + lineage path
 7. Incident report written to DataHub
+
+## Testing
+
+```bash
+# Run all 62 tests
+python -m pytest tests/ -v
+
+# Run specific agent tests
+python -m pytest tests/test_tracer.py -v
+python -m pytest tests/test_checker.py -v
+python -m pytest tests/test_e2e.py -v
+```
+
+Test coverage:
+- **Actions Plugin** (16 tests) — Event filtering, incident extraction, callback dispatch
+- **Coordinator** (9 tests) — Agent message protocol, dispatch, error handling
+- **Tracer Agent** (9 tests) — Lineage parsing, candidate scoring, path finding
+- **Checker Agent** (8 tests) — Validation rules, confidence scoring, rejection
+- **Notifier Agent** (5 tests) — Alert formatting, Slack webhook, error handling
+- **Reporter Agent** (7 tests) — Report generation, document save, tag application
+- **E2E Pipeline** (9 tests) — Full pipeline integration, agent failure resilience
 
 ## License
 
