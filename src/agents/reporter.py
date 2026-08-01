@@ -42,8 +42,8 @@ class ReporterAgent(BaseAgent):
         dataset_urn = message.context.get("dataset_urn", "")
         assertion_urn = message.context.get("assertion_urn", "")
         error_message = message.context.get("error_message", "")
-        tracer_result = message.context.get("tracer_result", {})
-        checker_result = message.context.get("checker_result", {})
+        tracer_result = message.context.get("tracer_result") or {}
+        checker_result = message.context.get("checker_result") or {}
 
         report = self._generate_report(
             dataset_urn=dataset_urn,

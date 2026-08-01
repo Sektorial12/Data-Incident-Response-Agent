@@ -162,16 +162,29 @@ class CoordinatorAgent:
             return {"status": AgentStatus.FAILED.value, "error": str(e)}
 
 
-def handle_incident(incident: IncidentEvent) -> None:
+def handle_incident(incident: IncidentEvent) -> dict[str, Any] | None:
     """Callback for the DataHub Actions plugin.
 
-    Creates a default CoordinatorAgent with MCP client and dispatches.
-    Sub-agents will be wired in Phase 4+.
+    Creates a CoordinatorAgent with MCP client and all sub-agents wired,
+    then dispatches the incident response pipeline.
     """
+    from src.agents.checker import CheckerAgent
+    from src.agents.notifier import NotifierAgent
+    from src.agents.reporter import ReporterAgent
+    from src.agents.tracer import TracerAgent
+
     mcp = MCPClient()
-    coordinator = CoordinatorAgent(mcp_client=mcp)
+    coordinator = CoordinatorAgent(
+        mcp_client=mcp,
+        tracer=TracerAgent(mcp),
+        checker=CheckerAgent(mcp),
+        notifier=NotifierAgent(mcp),
+        reporter=ReporterAgent(mcp),
+    )
     try:
         result = coordinator.handle_incident(incident)
         logger.info("Incident response result: %s", result)
+        return result
     except Exception as e:
         logger.error("Coordinator failed: %s", e)
+        return None
