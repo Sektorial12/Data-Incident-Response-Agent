@@ -1,0 +1,31 @@
+# Agent Configuration
+llm:
+  model: "claude-3-5-sonnet-20241022"
+  max_tokens: 4096
+  temperature: 0.1
+
+lineage:
+  max_hops: 3
+  direction: "UPSTREAM"
+
+confidence:
+  confirmed_threshold: 0.8
+  probable_threshold: 0.5
+  rejected_below: 0.5
+
+timeout:
+  agent_seconds: 30
+  mcp_call_seconds: 15
+  llm_call_seconds: 20
+
+agents:
+  tracer:
+    enabled: true
+    max_candidates: 5
+  checker:
+    enabled: true
+    parallel: false
+  notifier:
+    enabled: true
+  reporter:
+    enabled: true

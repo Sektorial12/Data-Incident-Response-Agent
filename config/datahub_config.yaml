@@ -1,0 +1,20 @@
+# DataHub Configuration
+gms:
+  server_url: "http://localhost:8080"
+  frontend_url: "http://localhost:9002"
+
+mcp:
+  server_url: "http://localhost:3000"
+  mutation_enabled: true
+
+auth:
+  method: "service_account"
+  token_env_var: "DATAHUB_ACCESS_TOKEN"
+
+actions:
+  event_filter:
+    entity_type: "dataset"
+    aspect_types:
+      - "DataQualityAssertion"
+    event_types:
+      - "MCL"
