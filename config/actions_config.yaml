@@ -1,0 +1,31 @@
+name: "incident_response"
+
+source:
+  type: "kafka"
+  config:
+    connection:
+      bootstrap: ${KAFKA_BOOTSTRAP_SERVER:-localhost:9092}
+      schema_registry_url: ${SCHEMA_REGISTRY_URL:-http://localhost:8081}
+
+filter:
+  event_type: "MetadataChangeLogEvent_v1"
+  event:
+    entityType: "assertion"
+    aspectName: "assertionRunEvent"
+
+action:
+  type: "src.datahub_actions_plugin.plugin:IncidentResponseAction"
+  config:
+    datahub_server: "http://localhost:8080"
+    datahub_token: ${DATAHUB_ACCESS_TOKEN}
+    callback_module: "src.coordinator"
+    callback_function: "handle_incident"
+
+options:
+  retry_count: 1
+  failure_mode: "CONTINUE"
+  failed_events_dir: "/tmp/datahub/actions"
+
+datahub:
+  server: "http://localhost:8080"
+  token: ${DATAHUB_ACCESS_TOKEN}
