@@ -6,12 +6,14 @@ sub-agents (Tracer, Checker, Notifier, Reporter), and aggregates results.
 
 import logging
 import time
+import uuid
 from typing import Any
 
 from src.agents.base import BaseAgent
 from src.agents.protocol import AgentMessage, AgentStatus
 from src.datahub_actions_plugin.incident_event import IncidentEvent
 from src.mcp_client.client import MCPClient
+from src.store.incident_store import IncidentStore
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +43,7 @@ class CoordinatorAgent:
         checker: BaseAgent | None = None,
         notifier: BaseAgent | None = None,
         reporter: BaseAgent | None = None,
+        store: IncidentStore | None = None,
     ) -> None:
         self.mcp = mcp_client
         self.config = config or {}
@@ -49,13 +52,27 @@ class CoordinatorAgent:
         self.notifier = notifier
         self.reporter = reporter
         self.timeout_seconds = self.config.get("timeout_seconds", 30)
+        self.store = store
 
     def handle_incident(self, incident: IncidentEvent) -> dict[str, Any]:
         """Main entry point — receive incident and orchestrate response."""
         start_time = time.time()
         logger.info("=== Coordinator handling incident: %s ===", incident.summary())
 
+        incident_id = str(uuid.uuid4())
+        dedup_key = f"{incident.assertion_urn}:{incident.dataset_urn}"
+
+        if self.store:
+            self.store.save_incident(
+                incident_id=incident_id,
+                assertion_urn=incident.assertion_urn,
+                dataset_urn=incident.dataset_urn,
+                error_message=incident.error_message,
+                dedup_key=dedup_key,
+            )
+
         results: dict[str, Any] = {
+            "incident_id": incident_id,
             "incident": incident.summary(),
             "dataset_urn": incident.dataset_urn,
             "assertion_urn": incident.assertion_urn,
@@ -118,6 +135,19 @@ class CoordinatorAgent:
         elapsed = time.time() - start_time
         results["elapsed_seconds"] = round(elapsed, 2)
         logger.info("=== Coordinator completed in %.2fs ===", elapsed)
+
+        if self.store:
+            validated = results.get("agents", {}).get("checker", {}).get(
+                "result", {}
+            ).get("validated_candidates", [])
+            self.store.update_incident(
+                incident_id=incident_id,
+                status="resolved",
+                root_causes=validated,
+                agent_results=results.get("agents", {}),
+                elapsed_seconds=round(elapsed, 2),
+            )
+
         return results
 
     def _dispatch_agent(
@@ -183,12 +213,14 @@ def handle_incident(incident: IncidentEvent) -> dict[str, Any] | None:
 
     mcp = MCPClient()
     llm = LLMClient.from_env()
+    store = IncidentStore()
     coordinator = CoordinatorAgent(
         mcp_client=mcp,
         tracer=TracerAgent(mcp),
         checker=CheckerAgent(mcp, llm_client=llm),
         notifier=NotifierAgent(mcp),
         reporter=ReporterAgent(mcp),
+        store=store,
     )
     try:
         result = coordinator.handle_incident(incident)
