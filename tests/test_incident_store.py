@@ -116,11 +116,13 @@ class TestIncidentStoreDedup:
         assert recent is not None
         assert recent["id"] == "inc-1"
 
-    def test_find_recent_returns_none_after_resolve(self, store):
+    def test_find_recent_returns_after_resolve(self, store):
+        """Dedup should suppress even after an incident is resolved."""
         store.save_incident("inc-1", "a1", "d1", dedup_key="a1:d1")
         store.update_incident("inc-1", status="resolved")
         recent = store.find_recent("a1:d1", within_seconds=900)
-        assert recent is None
+        assert recent is not None
+        assert recent["id"] == "inc-1"
 
     def test_find_recent_different_key_returns_none(self, store):
         store.save_incident("inc-1", "a1", "d1", dedup_key="a1:d1")

@@ -1,13 +1,16 @@
 """Data Incident Response Agent - Main Entry Point.
 
-Starts the DataHub Actions listener which listens for assertion failure
-events on Kafka and dispatches them through the agent pipeline.
+Starts the API server (health, metrics, dashboard) and the DataHub Actions
+listener which listens for assertion failure events on Kafka and dispatches
+them through the agent pipeline.
 """
 
 import logging
 import os
+import signal
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -21,6 +24,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+_actions_proc: subprocess.Popen | None = None
+
 
 def _check_env() -> list[str]:
     """Validate required environment variables. Returns list of missing names."""
@@ -29,7 +34,41 @@ def _check_env() -> list[str]:
     return missing
 
 
+def _start_api_server() -> threading.Thread:
+    """Start the FastAPI server in a daemon thread."""
+    import uvicorn
+
+    from src.api.server import create_app
+    from src.store.incident_store import IncidentStore
+
+    app = create_app(store=IncidentStore())
+    api_port = int(os.getenv("API_PORT", "8000"))
+
+    def _run() -> None:
+        uvicorn.run(app, host="0.0.0.0", port=api_port, log_level="warning")
+
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+    logger.info("API server started on port %d", api_port)
+    return t
+
+
+def _signal_handler(signum, frame) -> None:
+    """Graceful shutdown — terminate Actions subprocess."""
+    global _actions_proc
+    logger.info("Received signal %d, shutting down...", signum)
+    if _actions_proc and _actions_proc.poll() is None:
+        _actions_proc.terminate()
+        try:
+            _actions_proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            _actions_proc.kill()
+    sys.exit(0)
+
+
 def main() -> None:
+    global _actions_proc
+
     logger.info("Data Incident Response Agent starting...")
     logger.info("DataHub GMS URL: %s", os.getenv("DATAHUB_SERVER_URL", "NOT SET"))
     logger.info(
@@ -63,6 +102,11 @@ def main() -> None:
         logger.error("Actions config not found: %s", config_path)
         sys.exit(1)
 
+    signal.signal(signal.SIGINT, _signal_handler)
+    signal.signal(signal.SIGTERM, _signal_handler)
+
+    _start_api_server()
+
     logger.info("")
     logger.info("=== Agent Pipeline ===")
     logger.info(
@@ -74,19 +118,17 @@ def main() -> None:
     logger.info("")
 
     try:
-        subprocess.run(
+        _actions_proc = subprocess.Popen(
             ["datahub", "actions", "-c", str(config_path)],
-            check=True,
         )
-    except KeyboardInterrupt:
-        logger.info("Shutting down...")
+        _actions_proc.wait()
     except FileNotFoundError:
         logger.error(
             "datahub CLI not found. Install with: pip install acryl-datahub"
         )
         sys.exit(1)
-    except subprocess.CalledProcessError as e:
-        logger.error("DataHub Actions listener exited with error: %s", e)
+    except Exception as e:
+        logger.error("DataHub Actions listener error: %s", e)
         sys.exit(1)
 
 

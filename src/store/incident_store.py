@@ -145,13 +145,13 @@ class IncidentStore:
         """Find a recent incident with the same dedup key.
 
         Used for incident deduplication — if the same assertion+dataset
-        failed within the window, return the existing incident.
+        was seen within the window (regardless of status), return it.
         """
         with self._lock:
             conn = self._conn()
             row = conn.execute(
                 """SELECT * FROM incidents
-                   WHERE dedup_key = ? AND status = 'active'
+                   WHERE dedup_key = ?
                      AND created_at >= datetime('now', ?)
                    ORDER BY created_at DESC LIMIT 1""",
                 (dedup_key, f"-{within_seconds} seconds"),

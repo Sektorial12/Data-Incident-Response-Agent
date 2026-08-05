@@ -61,8 +61,24 @@ class CoordinatorAgent:
 
         incident_id = str(uuid.uuid4())
         dedup_key = f"{incident.assertion_urn}:{incident.dataset_urn}"
+        dedup_window = self.config.get("dedup_window_seconds", 900)
 
         if self.store:
+            existing = self.store.find_recent(dedup_key, within_seconds=dedup_window)
+            if existing:
+                logger.info(
+                    "Duplicate incident suppressed (key=%s, existing=%s, age within %ds window)",
+                    dedup_key,
+                    existing["id"],
+                    dedup_window,
+                )
+                return {
+                    "incident_id": existing["id"],
+                    "deduplicated": True,
+                    "message": "Suppressed duplicate incident within dedup window",
+                    "assertion_urn": incident.assertion_urn,
+                    "dataset_urn": incident.dataset_urn,
+                }
             self.store.save_incident(
                 incident_id=incident_id,
                 assertion_urn=incident.assertion_urn,
