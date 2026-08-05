@@ -34,7 +34,9 @@ class NotifierAgent(BaseAgent):
     name = "notifier"
     system_prompt = NOTIFIER_SYSTEM_PROMPT
 
-    def __init__(self, mcp_client: MCPClient, config: dict[str, Any] | None = None) -> None:
+    def __init__(
+        self, mcp_client: MCPClient, config: dict[str, Any] | None = None
+    ) -> None:
         super().__init__(mcp_client, config)
         self.webhook_url = self.config.get(
             "slack_webhook_url",
@@ -64,11 +66,13 @@ class NotifierAgent(BaseAgent):
         if not self.webhook_url or "your/webhook" in self.webhook_url:
             self.logger.warning("Slack webhook URL not configured — logging alert only")
             self.logger.info("Alert:\n%s", alert_text)
-            message.mark_completed({
-                "notified": False,
-                "reason": "webhook not configured",
-                "alert_text": alert_text,
-            })
+            message.mark_completed(
+                {
+                    "notified": False,
+                    "reason": "webhook not configured",
+                    "alert_text": alert_text,
+                }
+            )
             self._log_complete(message)
             return message
 
@@ -78,11 +82,13 @@ class NotifierAgent(BaseAgent):
             self._log_complete(message)
         except Exception as e:
             self.logger.error("Slack notification failed: %s", e)
-            message.mark_completed({
-                "notified": False,
-                "reason": str(e),
-                "alert_text": alert_text,
-            })
+            message.mark_completed(
+                {
+                    "notified": False,
+                    "reason": str(e),
+                    "alert_text": alert_text,
+                }
+            )
 
         return message
 
@@ -98,7 +104,7 @@ class NotifierAgent(BaseAgent):
         dataset_name = self._extract_dataset_name(dataset_urn)
 
         lines: list[str] = [
-            f":rotating_light: *Data Incident Detected*",
+            ":rotating_light: *Data Incident Detected*",
             f"*Time:* {timestamp}",
             f"*Dataset:* `{dataset_name}`",
             f"*Assertion:* `{assertion_urn}`",
@@ -113,11 +119,15 @@ class NotifierAgent(BaseAgent):
                 conf = c.get("confidence", 0)
                 reason = c.get("reasoning", c.get("reason", "unknown"))
                 candidate_urn = c.get("candidate_urn", c.get("urn", ""))
-                lines.append(f"  {i}. `{candidate_urn}` (confidence: {conf:.0%}) — {reason}")
+                lines.append(
+                    f"  {i}. `{candidate_urn}` (confidence: {conf:.0%}) — {reason}"
+                )
         else:
             lines.append("\n*Root Cause:* No validated candidates found")
 
-        dataset_url = f"{self.datahub_frontend_url}/dataset/{self._url_encode(dataset_urn)}"
+        dataset_url = (
+            f"{self.datahub_frontend_url}/dataset/{self._url_encode(dataset_urn)}"
+        )
         lines.append(f"\n<{dataset_url}|View in DataHub>")
 
         return "\n".join(lines)

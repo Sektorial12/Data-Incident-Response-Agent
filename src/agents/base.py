@@ -16,7 +16,9 @@ class BaseAgent(ABC):
     name: str = "base"
     system_prompt: str = ""
 
-    def __init__(self, mcp_client: MCPClient, config: dict[str, Any] | None = None) -> None:
+    def __init__(
+        self, mcp_client: MCPClient, config: dict[str, Any] | None = None
+    ) -> None:
         self.mcp = mcp_client
         self.config = config or {}
         self.logger = logging.getLogger(f"agent.{self.name}")
@@ -27,7 +29,9 @@ class BaseAgent(ABC):
         ...
 
     def _log_start(self, message: AgentMessage) -> None:
-        self.logger.info("Starting task: %s (from %s)", message.task, message.from_agent)
+        self.logger.info(
+            "Starting task: %s (from %s)", message.task, message.from_agent
+        )
 
     def _log_complete(self, message: AgentMessage) -> None:
         self.logger.info("Task completed: %s", message.task)

@@ -32,7 +32,9 @@ class ReporterAgent(BaseAgent):
     name = "reporter"
     system_prompt = REPORTER_SYSTEM_PROMPT
 
-    def __init__(self, mcp_client: MCPClient, config: dict[str, Any] | None = None) -> None:
+    def __init__(
+        self, mcp_client: MCPClient, config: dict[str, Any] | None = None
+    ) -> None:
         super().__init__(mcp_client, config)
 
     def run(self, message: AgentMessage) -> AgentMessage:
@@ -54,6 +56,7 @@ class ReporterAgent(BaseAgent):
         )
 
         document_urn = None
+        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
         try:
             doc_result = self.mcp.save_document(
                 document_type="Note",
@@ -61,13 +64,17 @@ class ReporterAgent(BaseAgent):
                 content=report,
                 related_assets=[dataset_urn],
             )
-            document_urn = doc_result.get("urn") if isinstance(doc_result, dict) else None
+            document_urn = (
+                doc_result.get("urn") if isinstance(doc_result, dict) else None
+            )
             self.logger.info("Incident report saved to DataHub: %s", document_urn)
         except Exception as e:
             self.logger.error("Failed to save document: %s", e)
 
         validated = checker_result.get("validated_candidates", [])
-        root_cause_urns = [v.get("candidate_urn", "") for v in validated if v.get("candidate_urn")]
+        root_cause_urns = [
+            v.get("candidate_urn", "") for v in validated if v.get("candidate_urn")
+        ]
         if root_cause_urns:
             try:
                 self.mcp.add_tags(
@@ -78,11 +85,24 @@ class ReporterAgent(BaseAgent):
             except Exception as e:
                 self.logger.warning("Failed to tag root cause: %s", e)
 
-        message.mark_completed({
-            "document_urn": document_urn,
-            "report_length": len(report),
-            "report_preview": report[:500],
-        })
+        if root_cause_urns:
+            for rc_urn in root_cause_urns:
+                try:
+                    incident_ref = f"\n\n---\n**Incident Report:** {document_urn or 'N/A'} ({timestamp})\n"
+                    self.mcp.update_description(rc_urn, incident_ref)
+                    self.logger.debug("Updated description for %s", rc_urn)
+                except Exception as e:
+                    self.logger.warning(
+                        "Failed to update description for %s: %s", rc_urn, e
+                    )
+
+        message.mark_completed(
+            {
+                "document_urn": document_urn,
+                "report_length": len(report),
+                "report_preview": report[:500],
+            }
+        )
         self._log_complete(message)
         return message
 
@@ -102,25 +122,27 @@ class ReporterAgent(BaseAgent):
         validated = checker_result.get("validated_candidates", [])
 
         lines: list[str] = [
-            f"# Data Incident Report",
-            f"",
+            "# Data Incident Report",
+            "",
             f"**Generated:** {timestamp}",
             f"**Dataset:** `{dataset_name}`",
             f"**Assertion:** `{assertion_urn}`",
-            f"",
-            f"## Incident Summary",
-            f"",
+            "",
+            "## Incident Summary",
+            "",
             f"An assertion failure was detected on dataset `{dataset_name}`.",
         ]
 
         if error_message:
             lines.append(f"**Error:** {error_message}")
 
-        lines.extend([
-            f"",
-            f"## Root Cause Analysis",
-            f"",
-        ])
+        lines.extend(
+            [
+                "",
+                "## Root Cause Analysis",
+                "",
+            ]
+        )
 
         if validated:
             for i, vc in enumerate(validated, 1):
@@ -139,36 +161,44 @@ class ReporterAgent(BaseAgent):
         else:
             lines.append("No validated root causes were identified.\n")
 
-        lines.extend([
-            f"## Lineage Analysis",
-            f"",
-        ])
+        lines.extend(
+            [
+                "## Lineage Analysis",
+                "",
+            ]
+        )
 
         if candidates:
             for c in candidates[:5]:
                 urn = c.get("urn", "")
                 conf = c.get("confidence", 0)
                 path = c.get("path", [])
-                path_str = " -> ".join(self._extract_dataset_name(p) for p in path) if path else "N/A"
+                path_str = (
+                    " -> ".join(self._extract_dataset_name(p) for p in path)
+                    if path
+                    else "N/A"
+                )
                 lines.append(f"- `{urn}` (confidence: {conf:.0%}, path: {path_str})")
         else:
             lines.append("No upstream candidates were found.")
 
-        lines.extend([
-            f"",
-            f"## Recommended Actions",
-            f"",
-            f"1. Investigate the root cause dataset(s) identified above",
-            f"2. Check if the assertion failure is reproducible",
-            f"3. Review the data pipeline for any recent changes",
-            f"4. Consider adding additional assertions on upstream datasets",
-            f"",
-            f"## Incident Metadata",
-            f"",
-            f"- **Agent:** Data Incident Response Agent v0.1",
-            f"- **Tools used:** MCP Server (get_lineage, get_entities, save_document, add_tags)",
-            f"- **Pipeline:** Actions Plugin -> Coordinator -> Tracer -> Checker -> Reporter",
-        ])
+        lines.extend(
+            [
+                "",
+                "## Recommended Actions",
+                "",
+                "1. Investigate the root cause dataset(s) identified above",
+                "2. Check if the assertion failure is reproducible",
+                "3. Review the data pipeline for any recent changes",
+                "4. Consider adding additional assertions on upstream datasets",
+                "",
+                "## Incident Metadata",
+                "",
+                "- **Agent:** Data Incident Response Agent v0.1",
+                "- **Tools used:** MCP Server (get_lineage, get_entities, save_document, add_tags)",
+                "- **Pipeline:** Actions Plugin -> Coordinator -> Tracer -> Checker -> Reporter",
+            ]
+        )
 
         return "\n".join(lines)
 

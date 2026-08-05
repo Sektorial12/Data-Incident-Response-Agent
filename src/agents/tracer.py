@@ -5,7 +5,6 @@ examines each node's metadata, and returns ranked candidate root causes.
 """
 
 import logging
-import time
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -49,7 +48,9 @@ class TracerAgent(BaseAgent):
     name = "tracer"
     system_prompt = TRACER_SYSTEM_PROMPT
 
-    def __init__(self, mcp_client: MCPClient, config: dict[str, Any] | None = None) -> None:
+    def __init__(
+        self, mcp_client: MCPClient, config: dict[str, Any] | None = None
+    ) -> None:
         super().__init__(mcp_client, config)
         self.max_hops = self.config.get("max_lineage_hops", 3)
         self.confidence_threshold = self.config.get("confidence_threshold", 0.05)
@@ -75,11 +76,17 @@ class TracerAgent(BaseAgent):
 
         return message
 
-    def _trace_upstream(self, dataset_urn: str, max_hops: int) -> list[CandidateRootCause]:
+    def _trace_upstream(
+        self, dataset_urn: str, max_hops: int
+    ) -> list[CandidateRootCause]:
         """Retrieve upstream lineage and identify root cause candidates."""
-        self.logger.info("Tracing upstream from %s (max %d hops)", dataset_urn, max_hops)
+        self.logger.info(
+            "Tracing upstream from %s (max %d hops)", dataset_urn, max_hops
+        )
 
-        lineage = self.mcp.get_lineage(dataset_urn, direction="UPSTREAM", max_hops=max_hops)
+        lineage = self.mcp.get_lineage(
+            dataset_urn, direction="UPSTREAM", max_hops=max_hops
+        )
         upstream_nodes = self._extract_upstream_nodes(lineage)
 
         self.logger.info("Found %d upstream nodes", len(upstream_nodes))
@@ -95,7 +102,9 @@ class TracerAgent(BaseAgent):
         candidates.sort(key=lambda c: c.confidence, reverse=True)
 
         if not candidates:
-            self.logger.info("No candidates above threshold %.2f", self.confidence_threshold)
+            self.logger.info(
+                "No candidates above threshold %.2f", self.confidence_threshold
+            )
         else:
             self.logger.info(
                 "Identified %d candidates: %s",
@@ -113,7 +122,11 @@ class TracerAgent(BaseAgent):
             relationships = lineage_result.get("relationships", [])
             for rel in relationships:
                 if isinstance(rel, dict):
-                    urn = rel.get("urn") or rel.get("destinationUrn") or rel.get("sourceUrn")
+                    urn = (
+                        rel.get("urn")
+                        or rel.get("destinationUrn")
+                        or rel.get("sourceUrn")
+                    )
                     if urn and urn not in nodes:
                         nodes.append(urn)
 
@@ -126,7 +139,9 @@ class TracerAgent(BaseAgent):
 
         return nodes
 
-    def _evaluate_node(self, node_urn: str, failing_dataset_urn: str) -> CandidateRootCause | None:
+    def _evaluate_node(
+        self, node_urn: str, failing_dataset_urn: str
+    ) -> CandidateRootCause | None:
         """Evaluate a single upstream node as a potential root cause."""
         self.logger.debug("Evaluating node: %s", node_urn)
 
@@ -142,10 +157,9 @@ class TracerAgent(BaseAgent):
 
         try:
             schema_result = self.mcp.list_schema_fields(node_urn)
-            field_count = self._count_schema_fields(schema_result)
+            self._count_schema_fields(schema_result)
         except Exception as e:
             self.logger.debug("Could not get schema for %s: %s", node_urn, e)
-            field_count = 0
 
         if entity_info.get("has_failed_assertions"):
             confidence += 0.5
@@ -158,6 +172,14 @@ class TracerAgent(BaseAgent):
         if entity_info.get("freshness_stale"):
             confidence += 0.2
             reasons.append("freshness stale")
+
+        if entity_info.get("missing_lineage"):
+            confidence += 0.05
+            reasons.append("incomplete lineage")
+
+        if entity_info.get("recently_created"):
+            confidence += 0.1
+            reasons.append("recently created node")
 
         confidence = min(confidence, 1.0)
 
@@ -176,7 +198,9 @@ class TracerAgent(BaseAgent):
             platform=entity_info.get("platform"),
         )
 
-    def _extract_entity_info(self, entities_result: dict[str, Any], urn: str) -> dict[str, Any]:
+    def _extract_entity_info(
+        self, entities_result: dict[str, Any], urn: str
+    ) -> dict[str, Any]:
         """Extract relevant info from get_entities response."""
         info: dict[str, Any] = {}
 
@@ -187,15 +211,32 @@ class TracerAgent(BaseAgent):
                     info["name"] = entity.get("name") or entity.get("qualifiedName")
                     info["platform"] = entity.get("platform")
                     aspects = entity.get("aspects", [])
+                    aspect_names = set()
                     for aspect in aspects:
                         if isinstance(aspect, dict):
                             aspect_name = aspect.get("name", "")
+                            aspect_names.add(aspect_name)
                             if aspect_name == "assertionRunEvents":
                                 info["has_failed_assertions"] = True
                             if aspect_name == "schemaMetadata":
                                 info["recently_modified"] = True
                             if aspect_name == "datasetProperties":
                                 info["freshness_stale"] = False
+                            if aspect_name == "dataPlatformInfo":
+                                created = aspect.get("created", {})
+                                if isinstance(created, dict):
+                                    created_time = created.get("time")
+                                    if created_time:
+                                        import time as _time
+
+                                        age_seconds = (
+                                            _time.time() * 1000 - created_time
+                                        ) / 1000
+                                        if age_seconds < 86400 * 7:
+                                            info["recently_created"] = True
+
+                    if "upstreamLineage" not in aspect_names:
+                        info["missing_lineage"] = True
                     break
 
         return info
@@ -222,6 +263,8 @@ class TracerAgent(BaseAgent):
                 if paths and isinstance(paths[0], dict):
                     return [p.get("urn", str(p)) for p in paths[0].get("nodes", [])]
         except Exception as e:
-            self.logger.debug("Could not find path %s -> %s: %s", source_urn, target_urn, e)
+            self.logger.debug(
+                "Could not find path %s -> %s: %s", source_urn, target_urn, e
+            )
 
         return [source_urn, target_urn]

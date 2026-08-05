@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from typing import Optional
 
 
 @dataclass
@@ -11,11 +10,11 @@ class IncidentEvent:
     assertion_type: str
     result_status: str
     timestamp_ms: int
-    assertion_name: Optional[str] = None
-    dataset_name: Optional[str] = None
-    platform: Optional[str] = None
-    run_id: Optional[str] = None
-    error_message: Optional[str] = None
+    assertion_name: str | None = None
+    dataset_name: str | None = None
+    platform: str | None = None
+    run_id: str | None = None
+    error_message: str | None = None
     raw_event: dict = field(default_factory=dict, repr=False)
 
     @property

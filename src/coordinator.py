@@ -79,13 +79,18 @@ class CoordinatorAgent:
             "checker",
             self.checker,
             incident,
-            extra_context={"candidates": candidates, "dataset_urn": incident.dataset_urn},
+            extra_context={
+                "candidates": candidates,
+                "dataset_urn": incident.dataset_urn,
+            },
         )
         results["agents"]["checker"] = checker_result
 
         validated_candidates = []
         if checker_result.get("status") == AgentStatus.COMPLETED.value:
-            validated_candidates = checker_result.get("result", {}).get("validated_candidates", [])
+            validated_candidates = checker_result.get("result", {}).get(
+                "validated_candidates", []
+            )
 
         notifier_result = self._dispatch_agent(
             "notifier",
@@ -155,7 +160,9 @@ class CoordinatorAgent:
                 logger.error("%s failed: %s", agent_name, message.error)
                 return {"status": AgentStatus.FAILED.value, "error": message.error}
             else:
-                logger.warning("%s returned unexpected status: %s", agent_name, message.status)
+                logger.warning(
+                    "%s returned unexpected status: %s", agent_name, message.status
+                )
                 return {"status": message.status.value, "result": message.result}
         except Exception as e:
             logger.error("%s raised exception: %s", agent_name, e)
@@ -172,12 +179,14 @@ def handle_incident(incident: IncidentEvent) -> dict[str, Any] | None:
     from src.agents.notifier import NotifierAgent
     from src.agents.reporter import ReporterAgent
     from src.agents.tracer import TracerAgent
+    from src.llm.client import LLMClient
 
     mcp = MCPClient()
+    llm = LLMClient.from_env()
     coordinator = CoordinatorAgent(
         mcp_client=mcp,
         tracer=TracerAgent(mcp),
-        checker=CheckerAgent(mcp),
+        checker=CheckerAgent(mcp, llm_client=llm),
         notifier=NotifierAgent(mcp),
         reporter=ReporterAgent(mcp),
     )

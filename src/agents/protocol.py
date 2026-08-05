@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 
 class AgentStatus(str, Enum):
@@ -20,9 +20,9 @@ class AgentMessage:
     to_agent: str
     task: str
     context: dict[str, Any] = field(default_factory=dict)
-    result: Optional[dict[str, Any]] = None
+    result: dict[str, Any] | None = None
     status: AgentStatus = AgentStatus.PENDING
-    error: Optional[str] = None
+    error: str | None = None
 
     def mark_in_progress(self) -> None:
         self.status = AgentStatus.IN_PROGRESS

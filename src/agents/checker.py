@@ -12,6 +12,7 @@ from typing import Any
 
 from src.agents.base import BaseAgent
 from src.agents.protocol import AgentMessage
+from src.llm.client import LLMClient
 from src.mcp_client.client import MCPClient
 
 logger = logging.getLogger(__name__)
@@ -58,9 +59,15 @@ class CheckerAgent(BaseAgent):
     name = "checker"
     system_prompt = CHECKER_SYSTEM_PROMPT
 
-    def __init__(self, mcp_client: MCPClient, config: dict[str, Any] | None = None) -> None:
+    def __init__(
+        self,
+        mcp_client: MCPClient,
+        config: dict[str, Any] | None = None,
+        llm_client: LLMClient | None = None,
+    ) -> None:
         super().__init__(mcp_client, config)
         self.confidence_threshold = self.config.get("confidence_threshold", 0.5)
+        self.llm = llm_client or LLMClient.from_env()
 
     def run(self, message: AgentMessage) -> AgentMessage:
         """Execute the validation workflow."""
@@ -68,7 +75,9 @@ class CheckerAgent(BaseAgent):
 
         candidates = message.context.get("candidates", [])
         if not candidates:
-            message.mark_completed({"validated_candidates": [], "summary": "no candidates to validate"})
+            message.mark_completed(
+                {"validated_candidates": [], "summary": "no candidates to validate"}
+            )
             self._log_complete(message)
             return message
 
@@ -80,8 +89,12 @@ class CheckerAgent(BaseAgent):
             validation = self._validate_candidate(urn, candidate, message.context)
             results.append(validation.to_dict())
 
-        confirmed = [r for r in results if r["status"] == ValidationStatus.CONFIRMED.value]
-        probable = [r for r in results if r["status"] == ValidationStatus.PROBABLE.value]
+        confirmed = [
+            r for r in results if r["status"] == ValidationStatus.CONFIRMED.value
+        ]
+        probable = [
+            r for r in results if r["status"] == ValidationStatus.PROBABLE.value
+        ]
         validated = confirmed + probable
 
         self.logger.info(
@@ -92,11 +105,13 @@ class CheckerAgent(BaseAgent):
             len(results) - len(confirmed) - len(probable),
         )
 
-        message.mark_completed({
-            "validated_candidates": validated,
-            "all_results": results,
-            "summary": f"{len(confirmed)} confirmed, {len(probable)} probable, {len(results) - len(validated)} rejected",
-        })
+        message.mark_completed(
+            {
+                "validated_candidates": validated,
+                "all_results": results,
+                "summary": f"{len(confirmed)} confirmed, {len(probable)} probable, {len(results) - len(validated)} rejected",
+            }
+        )
         self._log_complete(message)
         return message
 
@@ -146,6 +161,16 @@ class CheckerAgent(BaseAgent):
 
         confidence = min(confidence, 1.0)
 
+        llm_reasoning = self._llm_assess(
+            urn, candidate, entity_info, context, confidence, reasons
+        )
+        if llm_reasoning:
+            llm_confidence = llm_reasoning.get("confidence_adjustment", 0.0)
+            confidence = min(max(confidence + llm_confidence, 0.0), 1.0)
+            llm_text = llm_reasoning.get("reasoning", "")
+            if llm_text:
+                reasons.append(f"LLM: {llm_text}")
+
         if confidence >= 0.7:
             status = ValidationStatus.CONFIRMED
         elif confidence >= self.confidence_threshold:
@@ -165,7 +190,9 @@ class CheckerAgent(BaseAgent):
             evidence=evidence,
         )
 
-    def _extract_entity_info(self, entities_result: dict[str, Any], urn: str) -> dict[str, Any]:
+    def _extract_entity_info(
+        self, entities_result: dict[str, Any], urn: str
+    ) -> dict[str, Any]:
         """Extract relevant info from get_entities response."""
         info: dict[str, Any] = {}
 
@@ -197,3 +224,48 @@ class CheckerAgent(BaseAgent):
                 if isinstance(e, dict) and "document" in e.get("urn", "").lower()
             )
         return 0
+
+    def _llm_assess(
+        self,
+        urn: str,
+        candidate: dict[str, Any],
+        entity_info: dict[str, Any],
+        context: dict[str, Any],
+        heuristic_confidence: float,
+        reasons: list[str],
+    ) -> dict[str, Any] | None:
+        """Use LLM to assess whether this candidate explains the assertion failure.
+
+        Returns a dict with 'confidence_adjustment' (-0.2 to +0.2) and 'reasoning',
+        or None if LLM is unavailable.
+        """
+        if not self.llm.is_available():
+            return None
+
+        assertion_urn = context.get("assertion_urn", "unknown")
+        error_message = context.get("error_message", "unknown")
+        dataset_urn = context.get("dataset_urn", "unknown")
+
+        user_context = (
+            f"Failing dataset: {dataset_urn}\n"
+            f"Assertion: {assertion_urn}\n"
+            f"Error: {error_message}\n"
+            f"Candidate URN: {urn}\n"
+            f"Candidate confidence so far: {heuristic_confidence:.2f}\n"
+            f"Heuristic signals: {', '.join(reasons) if reasons else 'none'}\n"
+            f"Entity metadata: {entity_info}\n"
+            f"Candidate details: {candidate}\n\n"
+            f"Assess whether this candidate could be the root cause of the assertion failure.\n"
+            f'Respond as JSON: {{"confidence_adjustment": <float -0.2 to +0.2>, '
+            f'"reasoning": "<one sentence explanation>"}}'
+        )
+
+        try:
+            result = self.llm.assess_json(CHECKER_SYSTEM_PROMPT, user_context)
+        except Exception as e:
+            self.logger.warning("LLM assessment failed for %s: %s", urn, e)
+            return None
+
+        if result:
+            self.logger.debug("LLM assessment for %s: %s", urn, result)
+        return result

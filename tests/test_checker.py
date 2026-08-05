@@ -3,16 +3,18 @@
 import logging
 from unittest.mock import MagicMock
 
-import pytest
-
-from src.agents.checker import CheckerAgent, ValidationStatus, ValidationResult
+from src.agents.checker import CheckerAgent, ValidationResult, ValidationStatus
 from src.agents.protocol import AgentMessage
 from src.mcp_client.client import MCPClient
 
 logging.disable(logging.CRITICAL)
 
-CANDIDATE_URN_1 = "urn:li:dataset:(urn:li:dataPlatform:sqlite,healthcare.main.staging_patients,PROD)"
-CANDIDATE_URN_2 = "urn:li:dataset:(urn:li:dataPlatform:sqlite,healthcare.main.raw_patients,PROD)"
+CANDIDATE_URN_1 = (
+    "urn:li:dataset:(urn:li:dataPlatform:sqlite,healthcare.main.staging_patients,PROD)"
+)
+CANDIDATE_URN_2 = (
+    "urn:li:dataset:(urn:li:dataPlatform:sqlite,healthcare.main.raw_patients,PROD)"
+)
 
 
 def make_mcp_mock(
@@ -113,7 +115,12 @@ class TestCheckerAgent:
         assert all_results[0]["status"] == ValidationStatus.REJECTED.value
 
     def test_confidence_capped_at_1(self):
-        aspects = {CANDIDATE_URN_1: [{"name": "assertionRunEvents"}, {"name": "schemaMetadata"}]}
+        aspects = {
+            CANDIDATE_URN_1: [
+                {"name": "assertionRunEvents"},
+                {"name": "schemaMetadata"},
+            ]
+        }
         mcp = make_mcp_mock(entity_aspects=aspects, search_docs=3)
         agent = CheckerAgent(mcp)
         candidates = [{"urn": CANDIDATE_URN_1, "confidence": 0.9}]

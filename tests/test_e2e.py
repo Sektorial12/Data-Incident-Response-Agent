@@ -5,11 +5,9 @@ Coordinator -> Tracer -> Checker -> Notifier -> Reporter
 """
 
 import logging
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-import pytest
-
-from src.agents.checker import CheckerAgent, ValidationStatus
+from src.agents.checker import CheckerAgent
 from src.agents.notifier import NotifierAgent
 from src.agents.reporter import ReporterAgent
 from src.agents.tracer import TracerAgent
@@ -19,9 +17,15 @@ from src.mcp_client.client import MCPClient
 
 logging.disable(logging.CRITICAL)
 
-DATASET_URN = "urn:li:dataset:(urn:li:dataPlatform:sqlite,healthcare.main.mart_billing,PROD)"
-UPSTREAM_1 = "urn:li:dataset:(urn:li:dataPlatform:sqlite,healthcare.main.staging_patients,PROD)"
-UPSTREAM_2 = "urn:li:dataset:(urn:li:dataPlatform:sqlite,healthcare.main.raw_patients,PROD)"
+DATASET_URN = (
+    "urn:li:dataset:(urn:li:dataPlatform:sqlite,healthcare.main.mart_billing,PROD)"
+)
+UPSTREAM_1 = (
+    "urn:li:dataset:(urn:li:dataPlatform:sqlite,healthcare.main.staging_patients,PROD)"
+)
+UPSTREAM_2 = (
+    "urn:li:dataset:(urn:li:dataPlatform:sqlite,healthcare.main.raw_patients,PROD)"
+)
 ASSERTION_URN = "urn:li:assertion:billingAmountPositive"
 
 
@@ -61,7 +65,9 @@ def make_full_mcp_mock() -> MagicMock:
 
     mcp.get_entities.side_effect = get_entities_side_effect
 
-    mcp.list_schema_fields.return_value = {"fields": [{"fieldPath": "patient_id"}, {"fieldPath": "billing_amount"}]}
+    mcp.list_schema_fields.return_value = {
+        "fields": [{"fieldPath": "patient_id"}, {"fieldPath": "billing_amount"}]
+    }
 
     # Tracer: get_lineage_paths_between
     mcp.get_lineage_paths_between.return_value = {"paths": [[UPSTREAM_1, DATASET_URN]]}
@@ -175,7 +181,11 @@ class TestE2EPipeline:
         coordinator.handle_incident(make_incident())
         mcp.add_tags.assert_called()
         call_args = mcp.add_tags.call_args
-        tag_urns = call_args.kwargs.get("tag_urns") if call_args.kwargs else call_args[0].get("tag_urns", [])
+        tag_urns = (
+            call_args.kwargs.get("tag_urns")
+            if call_args.kwargs
+            else call_args[0].get("tag_urns", [])
+        )
         assert "urn:li:tag:incident-root-cause" in tag_urns
 
     def test_pipeline_survives_agent_failure(self):

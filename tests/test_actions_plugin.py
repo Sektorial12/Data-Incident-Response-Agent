@@ -6,8 +6,6 @@ from dataclasses import dataclass
 from typing import Any
 from unittest.mock import MagicMock
 
-import pytest
-
 from src.datahub_actions_plugin.filters import is_assertion_failure_event
 from src.datahub_actions_plugin.incident_event import IncidentEvent
 from src.datahub_actions_plugin.plugin import IncidentResponseAction
@@ -43,7 +41,10 @@ def make_mcl_event(
             "entityUrn": entity_urn,
             "changeType": change_type,
             "aspectName": aspect_name,
-            "aspect": {"value": json.dumps(aspect_value), "contentType": "application/json"},
+            "aspect": {
+                "value": json.dumps(aspect_value),
+                "contentType": "application/json",
+            },
         },
     )
 
@@ -63,7 +64,11 @@ class TestEventFiltering:
 
     def test_rejects_success_status(self):
         event = make_mcl_event(
-            aspect_value={"status": "SUCCESS", "asserteeUrn": "urn:li:dataset:test", "timestampMillis": 1}
+            aspect_value={
+                "status": "SUCCESS",
+                "asserteeUrn": "urn:li:dataset:test",
+                "timestampMillis": 1,
+            }
         )
         assert is_assertion_failure_event(event) is False
 
@@ -77,7 +82,11 @@ class TestEventFiltering:
 
     def test_accepts_error_status(self):
         event = make_mcl_event(
-            aspect_value={"status": "ERROR", "asserteeUrn": "urn:li:dataset:test", "timestampMillis": 1}
+            aspect_value={
+                "status": "ERROR",
+                "asserteeUrn": "urn:li:dataset:test",
+                "timestampMillis": 1,
+            }
         )
         assert is_assertion_failure_event(event) is True
 

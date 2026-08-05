@@ -3,8 +3,6 @@
 import logging
 from unittest.mock import MagicMock
 
-import pytest
-
 from src.agents.base import BaseAgent
 from src.agents.protocol import AgentMessage, AgentStatus
 from src.coordinator import CoordinatorAgent
@@ -80,7 +78,11 @@ class TestCoordinatorAgent:
 
     def test_dispatches_tracer_and_receives_result(self):
         mcp = MagicMock(spec=MCPClient)
-        tracer = MockAgent(result={"candidates": [{"urn": "urn:li:dataset:upstream1", "confidence": 0.8}]})
+        tracer = MockAgent(
+            result={
+                "candidates": [{"urn": "urn:li:dataset:upstream1", "confidence": 0.8}]
+            }
+        )
         coordinator = CoordinatorAgent(mcp_client=mcp, tracer=tracer)
         incident = make_incident()
         result = coordinator.handle_incident(incident)
@@ -114,8 +116,18 @@ class TestCoordinatorAgent:
 
     def test_full_pipeline_with_all_agents(self):
         mcp = MagicMock(spec=MCPClient)
-        tracer = MockAgent(result={"candidates": [{"urn": "urn:li:dataset:upstream1", "confidence": 0.9}]})
-        checker = MockAgent(result={"validated_candidates": [{"urn": "urn:li:dataset:upstream1", "confidence": 0.85}]})
+        tracer = MockAgent(
+            result={
+                "candidates": [{"urn": "urn:li:dataset:upstream1", "confidence": 0.9}]
+            }
+        )
+        checker = MockAgent(
+            result={
+                "validated_candidates": [
+                    {"urn": "urn:li:dataset:upstream1", "confidence": 0.85}
+                ]
+            }
+        )
         notifier = MockAgent(result={"notified": True})
         reporter = MockAgent(result={"document_urn": "urn:li:document:123"})
 

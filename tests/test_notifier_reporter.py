@@ -3,16 +3,16 @@
 import logging
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from src.agents.notifier import NotifierAgent
-from src.agents.protocol import AgentMessage, AgentStatus
+from src.agents.protocol import AgentMessage
 from src.agents.reporter import ReporterAgent
 from src.mcp_client.client import MCPClient
 
 logging.disable(logging.CRITICAL)
 
-DATASET_URN = "urn:li:dataset:(urn:li:dataPlatform:sqlite,healthcare.main.mart_billing,PROD)"
+DATASET_URN = (
+    "urn:li:dataset:(urn:li:dataPlatform:sqlite,healthcare.main.mart_billing,PROD)"
+)
 ASSERTION_URN = "urn:li:assertion:billingAmountPositive"
 
 
@@ -41,12 +41,22 @@ def make_reporter_message() -> AgentMessage:
             "error_message": "billing_amount has negative values",
             "tracer_result": {
                 "candidates": [
-                    {"urn": "urn:li:dataset:upstream1", "confidence": 0.8, "path": ["urn:li:dataset:upstream1", DATASET_URN]},
+                    {
+                        "urn": "urn:li:dataset:upstream1",
+                        "confidence": 0.8,
+                        "path": ["urn:li:dataset:upstream1", DATASET_URN],
+                    },
                 ],
             },
             "checker_result": {
                 "validated_candidates": [
-                    {"candidate_urn": "urn:li:dataset:upstream1", "status": "confirmed", "confidence": 0.9, "reasoning": "failed assertions", "evidence": ["evidence1"]},
+                    {
+                        "candidate_urn": "urn:li:dataset:upstream1",
+                        "status": "confirmed",
+                        "confidence": 0.9,
+                        "reasoning": "failed assertions",
+                        "evidence": ["evidence1"],
+                    },
                 ],
             },
         },
@@ -76,7 +86,11 @@ class TestNotifierAgent:
         mcp = MagicMock(spec=MCPClient)
         agent = NotifierAgent(mcp, config={"slack_webhook_url": ""})
         candidates = [
-            {"candidate_urn": "urn:li:dataset:upstream1", "confidence": 0.9, "reasoning": "failed assertions"},
+            {
+                "candidate_urn": "urn:li:dataset:upstream1",
+                "confidence": 0.9,
+                "reasoning": "failed assertions",
+            },
         ]
         result = agent.run(make_notifier_message(candidates))
         alert = result.result["alert_text"]
@@ -85,7 +99,9 @@ class TestNotifierAgent:
 
     def test_sends_to_slack_when_configured(self):
         mcp = MagicMock(spec=MCPClient)
-        agent = NotifierAgent(mcp, config={"slack_webhook_url": "https://hooks.slack.com/services/test"})
+        agent = NotifierAgent(
+            mcp, config={"slack_webhook_url": "https://hooks.slack.com/services/test"}
+        )
         with patch("urllib.request.urlopen") as mock_urlopen:
             mock_resp = MagicMock()
             mock_resp.status = 200
@@ -100,7 +116,9 @@ class TestNotifierAgent:
 
     def test_slack_failure_handled(self):
         mcp = MagicMock(spec=MCPClient)
-        agent = NotifierAgent(mcp, config={"slack_webhook_url": "https://hooks.slack.com/services/test"})
+        agent = NotifierAgent(
+            mcp, config={"slack_webhook_url": "https://hooks.slack.com/services/test"}
+        )
         with patch("urllib.request.urlopen", side_effect=RuntimeError("network error")):
             result = agent.run(make_notifier_message())
             assert result.is_completed

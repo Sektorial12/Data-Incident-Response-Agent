@@ -57,7 +57,4 @@ def is_assertion_failure_event(event: EventEnvelope) -> bool:
         return False
 
     status = aspect_value.get("status", "")
-    if status.upper() not in ("FAILED", "ERROR"):
-        return False
-
-    return True
+    return status.upper() in ("FAILED", "ERROR")

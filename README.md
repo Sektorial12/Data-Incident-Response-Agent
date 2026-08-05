@@ -97,7 +97,7 @@ docker-compose up -d
 ## Testing
 
 ```bash
-# Run all 62 tests
+# Run all 86 tests
 python -m pytest tests/ -v
 
 # Run specific agent tests
@@ -114,6 +114,8 @@ Test coverage:
 - **Notifier Agent** (5 tests) — Alert formatting, Slack webhook, error handling
 - **Reporter Agent** (7 tests) — Report generation, document save, tag application
 - **E2E Pipeline** (9 tests) — Full pipeline integration, agent failure resilience
+- **LLM Integration** (13 tests) — Model-agnostic client, heuristic fallback, confidence adjustment
+- **Edge Cases** (9 tests) — Retry/timeout, update_description, malformed events, empty lineage
 
 ## License
 

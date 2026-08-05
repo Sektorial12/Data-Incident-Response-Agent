@@ -1,19 +1,23 @@
 """Tests for the Tracer Agent."""
 
 import logging
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-import pytest
-
-from src.agents.protocol import AgentMessage, AgentStatus
+from src.agents.protocol import AgentMessage
 from src.agents.tracer import CandidateRootCause, TracerAgent
 from src.mcp_client.client import MCPClient
 
 logging.disable(logging.CRITICAL)
 
-DATASET_URN = "urn:li:dataset:(urn:li:dataPlatform:sqlite,healthcare.main.mart_billing,PROD)"
-UPSTREAM_URN_1 = "urn:li:dataset:(urn:li:dataPlatform:sqlite,healthcare.main.staging_patients,PROD)"
-UPSTREAM_URN_2 = "urn:li:dataset:(urn:li:dataPlatform:sqlite,healthcare.main.raw_patients,PROD)"
+DATASET_URN = (
+    "urn:li:dataset:(urn:li:dataPlatform:sqlite,healthcare.main.mart_billing,PROD)"
+)
+UPSTREAM_URN_1 = (
+    "urn:li:dataset:(urn:li:dataPlatform:sqlite,healthcare.main.staging_patients,PROD)"
+)
+UPSTREAM_URN_2 = (
+    "urn:li:dataset:(urn:li:dataPlatform:sqlite,healthcare.main.raw_patients,PROD)"
+)
 
 
 def make_message(dataset_urn: str = DATASET_URN) -> AgentMessage:
@@ -46,12 +50,22 @@ def make_mcp_mock(
         result = {"entities": []}
         for urn in urns:
             info = entity_info.get(urn, {})
-            result["entities"].append({"urn": urn, "name": info.get("name", urn), "aspects": info.get("aspects", [])})
+            result["entities"].append(
+                {
+                    "urn": urn,
+                    "name": info.get("name", urn),
+                    "aspects": info.get("aspects", []),
+                }
+            )
         return result
 
     mcp.get_entities.side_effect = get_entities_side_effect
-    mcp.list_schema_fields.return_value = {"fields": [{"fieldPath": f"field_{i}"} for i in range(schema_fields)]}
-    mcp.get_lineage_paths_between.return_value = {"paths": [[UPSTREAM_URN_1, DATASET_URN]]}
+    mcp.list_schema_fields.return_value = {
+        "fields": [{"fieldPath": f"field_{i}"} for i in range(schema_fields)]
+    }
+    mcp.get_lineage_paths_between.return_value = {
+        "paths": [[UPSTREAM_URN_1, DATASET_URN]]
+    }
     return mcp
 
 
@@ -86,12 +100,17 @@ class TestTracerAgent:
         agent = TracerAgent(mcp)
         result = agent.run(make_message())
         candidates = {c["urn"]: c for c in result.result["candidates"]}
-        assert candidates[UPSTREAM_URN_1]["confidence"] > candidates[UPSTREAM_URN_2]["confidence"]
+        assert (
+            candidates[UPSTREAM_URN_1]["confidence"]
+            > candidates[UPSTREAM_URN_2]["confidence"]
+        )
 
     def test_missing_dataset_urn_fails(self):
         mcp = make_mcp_mock()
         agent = TracerAgent(mcp)
-        msg = AgentMessage(from_agent="coordinator", to_agent="tracer", task="test", context={})
+        msg = AgentMessage(
+            from_agent="coordinator", to_agent="tracer", task="test", context={}
+        )
         result = agent.run(msg)
         assert result.is_failed
         assert "dataset_urn" in result.error
@@ -128,10 +147,46 @@ class TestTracerAgent:
         urns = [c["urn"] for c in candidates]
         assert DATASET_URN not in urns
 
+    def test_missing_lineage_adds_low_confidence(self):
+        mcp = make_mcp_mock(
+            lineage_nodes=[UPSTREAM_URN_1],
+            entity_info={
+                UPSTREAM_URN_1: {"aspects": [{"name": "schemaMetadata"}]},
+            },
+        )
+        agent = TracerAgent(mcp)
+        result = agent.run(make_message())
+        candidates = result.result["candidates"]
+        assert len(candidates) >= 1
+        assert "incomplete lineage" in candidates[0]["reason"]
+
+    def test_recently_created_adds_confidence(self):
+        import time as _time
+
+        recent_ms = (_time.time() * 1000) - (86400 * 1000)  # 1 day ago
+        mcp = make_mcp_mock(
+            lineage_nodes=[UPSTREAM_URN_1],
+            entity_info={
+                UPSTREAM_URN_1: {
+                    "aspects": [
+                        {"name": "dataPlatformInfo", "created": {"time": recent_ms}},
+                        {"name": "upstreamLineage"},
+                    ],
+                },
+            },
+        )
+        agent = TracerAgent(mcp)
+        result = agent.run(make_message())
+        candidates = result.result["candidates"]
+        assert len(candidates) >= 1
+        assert "recently created node" in candidates[0]["reason"]
+
 
 class TestCandidateRootCause:
     def test_to_dict(self):
-        c = CandidateRootCause(urn="test", confidence=0.8, reason="failed assertion", path=["a", "b"])
+        c = CandidateRootCause(
+            urn="test", confidence=0.8, reason="failed assertion", path=["a", "b"]
+        )
         d = c.to_dict()
         assert d["urn"] == "test"
         assert d["confidence"] == 0.8

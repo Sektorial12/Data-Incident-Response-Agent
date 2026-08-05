@@ -6,7 +6,7 @@ extracts structured incident data, and dispatches to the coordinator.
 
 import json
 import logging
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from datahub_actions.action.action import Action
 from datahub_actions.event.event_envelope import EventEnvelope
@@ -22,29 +22,40 @@ class IncidentResponseAction(Action):
     """Action that receives assertion failure events and dispatches to the coordinator."""
 
     @classmethod
-    def create(cls, config_dict: dict, ctx: PipelineContext) -> "IncidentResponseAction":
+    def create(
+        cls, config_dict: dict, ctx: PipelineContext
+    ) -> "IncidentResponseAction":
         callback_module = config_dict.get("callback_module")
         callback_function = config_dict.get("callback_function", "handle_incident")
         datahub_server = config_dict.get("datahub_server", "http://localhost:8080")
         datahub_token = config_dict.get("datahub_token", "")
 
-        callback: Optional[Callable[[IncidentEvent], None]] = None
+        callback: Callable[[IncidentEvent], None] | None = None
         if callback_module:
             try:
                 import importlib
 
                 mod = importlib.import_module(callback_module)
                 callback = getattr(mod, callback_function)
-                logger.info("Loaded incident callback: %s.%s", callback_module, callback_function)
+                logger.info(
+                    "Loaded incident callback: %s.%s",
+                    callback_module,
+                    callback_function,
+                )
             except (ImportError, AttributeError) as e:
-                logger.warning("Could not load callback %s.%s: %s", callback_module, callback_function, e)
+                logger.warning(
+                    "Could not load callback %s.%s: %s",
+                    callback_module,
+                    callback_function,
+                    e,
+                )
 
         return cls(ctx, callback, datahub_server, datahub_token)
 
     def __init__(
         self,
         ctx: PipelineContext,
-        callback: Optional[Callable[[IncidentEvent], None]] = None,
+        callback: Callable[[IncidentEvent], None] | None = None,
         datahub_server: str = "http://localhost:8080",
         datahub_token: str = "",
     ) -> None:
@@ -72,11 +83,15 @@ class IncidentResponseAction(Action):
                 self.callback(incident)
                 self._incidents_dispatched += 1
             except Exception as e:
-                logger.error("Callback failed for incident %s: %s", incident.assertion_urn, e)
+                logger.error(
+                    "Callback failed for incident %s: %s", incident.assertion_urn, e
+                )
         else:
-            logger.warning("No callback configured — incident logged only: %s", incident.summary())
+            logger.warning(
+                "No callback configured — incident logged only: %s", incident.summary()
+            )
 
-    def _extract_incident(self, event: EventEnvelope) -> Optional[IncidentEvent]:
+    def _extract_incident(self, event: EventEnvelope) -> IncidentEvent | None:
         payload = event.event if hasattr(event, "event") else {}
         if not isinstance(payload, dict):
             return None
