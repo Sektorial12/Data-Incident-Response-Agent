@@ -111,6 +111,23 @@ python src/main.py
 
 The agent now listens for assertion failure events on Kafka. When an assertion fails, the full pipeline executes automatically.
 
+### Docker
+
+```bash
+# Build
+docker build -t data-incident-response-agent .
+
+# Run (pass env vars at runtime)
+docker run --rm --network host \
+  -e DATAHUB_ACCESS_TOKEN=your_token \
+  -e DATAHUB_SERVICE_ACCOUNT_TOKEN=your_token \
+  -e GOOGLE_API_KEY=your_key \
+  -e SLACK_WEBHOOK_URL=your_webhook \
+  data-incident-response-agent
+```
+
+`--network host` is needed so the container can reach DataHub on localhost.
+
 ## Configuration
 
 ### `.env` file

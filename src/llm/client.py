@@ -12,6 +12,7 @@ Usage:
 import json
 import logging
 import os
+import time
 from typing import Any
 
 from dotenv import load_dotenv
@@ -19,6 +20,21 @@ from dotenv import load_dotenv
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+
+# Retryable error indicators (quota, rate limit, server overload)
+_RETRYABLE_MARKERS = (
+    "429",
+    "RESOURCE_EXHAUSTED",
+    "rate_limit",
+    "rate limit",
+    "quota",
+    "overloaded",
+    "503",
+    "502",
+    "temporarily unavailable",
+)
+_LLM_MAX_RETRIES = 3
+_LLM_RETRY_BASE_DELAY = 2.0
 
 
 class LLMClient:
@@ -105,6 +121,8 @@ class LLMClient:
     def assess(self, system_prompt: str, user_context: str) -> str | None:
         """Send a prompt to the LLM and return the text response.
 
+        Retries on quota/rate-limit errors with exponential backoff.
+
         Args:
             system_prompt: Instructions defining the LLM's role and task.
             user_context: Structured context (e.g., JSON string of incident data).
@@ -116,28 +134,49 @@ class LLMClient:
             logger.debug("LLM not available — skipping assessment")
             return None
 
-        try:
-            from langchain_core.messages import HumanMessage, SystemMessage
+        from langchain_core.messages import HumanMessage, SystemMessage
 
-            messages = [
-                SystemMessage(content=system_prompt),
-                HumanMessage(content=user_context),
-            ]
-            response = self._chat_model.invoke(messages)
-            content = response.content if hasattr(response, "content") else str(response)
-            # Google Gemini returns content as a list of part dicts: [{'type': 'text', 'text': '...'}]
-            if isinstance(content, list):
-                parts = []
-                for part in content:
-                    if isinstance(part, dict) and "text" in part:
-                        parts.append(part["text"])
-                    elif isinstance(part, str):
-                        parts.append(part)
-                return "".join(parts)
-            return str(content)
-        except Exception as e:
-            logger.error("LLM assessment failed: %s", e)
-            return None
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_context),
+        ]
+
+        for attempt in range(_LLM_MAX_RETRIES + 1):
+            try:
+                response = self._chat_model.invoke(messages)
+                content = response.content if hasattr(response, "content") else str(response)
+                # Google Gemini returns content as a list of part dicts: [{'type': 'text', 'text': '...'}]
+                if isinstance(content, list):
+                    parts = []
+                    for part in content:
+                        if isinstance(part, dict) and "text" in part:
+                            parts.append(part["text"])
+                        elif isinstance(part, str):
+                            parts.append(part)
+                    return "".join(parts)
+                return str(content)
+            except Exception as e:
+                err_str = str(e)
+                if attempt < _LLM_MAX_RETRIES and self._is_retryable(err_str):
+                    delay = _LLM_RETRY_BASE_DELAY * (2**attempt)
+                    logger.warning(
+                        "LLM rate-limited (attempt %d/%d): %s. Retrying in %.1fs...",
+                        attempt + 1,
+                        _LLM_MAX_RETRIES + 1,
+                        err_str[:120],
+                        delay,
+                    )
+                    time.sleep(delay)
+                    continue
+                logger.error("LLM assessment failed: %s", err_str[:200])
+                return None
+        return None
+
+    @staticmethod
+    def _is_retryable(error_msg: str) -> bool:
+        """Check if an error message indicates a retryable condition."""
+        msg_lower = error_msg.lower()
+        return any(marker.lower() in msg_lower for marker in _RETRYABLE_MARKERS)
 
     def assess_json(
         self, system_prompt: str, user_context: str
