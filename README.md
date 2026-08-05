@@ -62,15 +62,13 @@ If no API key is set, agents fall back to heuristic-only mode (still functional,
 ## DataHub Capabilities Used
 
 - DataHub Actions (event-driven automation)
-- MCP Server (15+ tools, mutations enabled) — used in-process via FastMCP
+- MCP Server (mutations enabled) — used in-process via FastMCP
 - DataHub Skills (lineage, quality, enrich)
 - `get_lineage` (multi-hop UPSTREAM)
 - `get_lineage_paths_between` (precise A-to-B path finding)
-- `search` with SQL-like filters
+- `search` (entity discovery)
 - `get_entities`, `list_schema_fields`
 - `save_document`, `add_tags`, `update_description` (write-back)
-- `search_documents` (existing incident search)
-- Service Accounts with Default Views
 
 ## Prerequisites
 
@@ -175,10 +173,9 @@ python -m pytest tests/test_e2e.py -v
 Test coverage:
 - **Actions Plugin** (16 tests) — Event filtering, incident extraction, callback dispatch
 - **Coordinator** (9 tests) — Agent message protocol, dispatch, error handling
-- **Tracer Agent** (9 tests) — Lineage parsing, candidate scoring, path finding
+- **Tracer Agent** (11 tests) — Lineage parsing, candidate scoring, path finding
 - **Checker Agent** (8 tests) — Validation rules, confidence scoring, rejection
-- **Notifier Agent** (5 tests) — Alert formatting, Slack webhook, error handling
-- **Reporter Agent** (7 tests) — Report generation, document save, tag application
+- **Notifier + Reporter** (11 tests) — Alert formatting, Slack webhook, report generation, document save, tag application
 - **E2E Pipeline** (9 tests) — Full pipeline integration, agent failure resilience
 - **LLM Integration** (13 tests) — Model-agnostic client, heuristic fallback, confidence adjustment
 - **Edge Cases** (9 tests) — Retry/timeout, update_description, malformed events, empty lineage

@@ -1,7 +1,7 @@
 """LLM client — model-agnostic reasoning layer for agents.
 
-Supports Anthropic Claude and OpenAI via LangChain. Falls back to
-heuristic-only mode (returns None) when no API key is configured.
+Supports Anthropic Claude, OpenAI GPT, and Google Gemini via LangChain.
+Falls back to heuristic-only mode (returns None) when no API key is configured.
 
 Usage:
     llm = LLMClient.from_env()
