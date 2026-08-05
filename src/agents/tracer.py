@@ -11,10 +11,12 @@ from typing import Any
 from src.agents.base import BaseAgent
 from src.agents.protocol import AgentMessage
 from src.mcp_client.client import MCPClient
+from src.skills.loader import augment_prompt
 
 logger = logging.getLogger(__name__)
 
-TRACER_SYSTEM_PROMPT = """\
+TRACER_SYSTEM_PROMPT = augment_prompt(
+    """\
 You are the Tracer Agent in a Data Incident Response system.
 Given a dataset URN with an assertion failure, your job is to:
 1. Retrieve the dataset's upstream lineage (up to 3 hops)
@@ -24,7 +26,9 @@ Given a dataset URN with an assertion failure, your job is to:
 4. For each candidate, use get_lineage_paths_between to find the exact path
    from the candidate to the failing dataset
 5. Return a ranked list of candidate root causes with confidence scores
-"""
+""",
+    "datahub-lineage",
+)
 
 
 @dataclass

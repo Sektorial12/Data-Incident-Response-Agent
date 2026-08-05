@@ -97,7 +97,7 @@ docker-compose up -d
 ## Testing
 
 ```bash
-# Run all 86 tests
+# Run all 92 tests
 python -m pytest tests/ -v
 
 # Run specific agent tests
@@ -116,6 +116,7 @@ Test coverage:
 - **E2E Pipeline** (9 tests) — Full pipeline integration, agent failure resilience
 - **LLM Integration** (13 tests) — Model-agnostic client, heuristic fallback, confidence adjustment
 - **Edge Cases** (9 tests) — Retry/timeout, update_description, malformed events, empty lineage
+- **Skills Loader** (6 tests) — DataHub skill guidance loading, prompt augmentation, fallback
 
 ## License
 

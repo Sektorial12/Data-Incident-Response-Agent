@@ -14,10 +14,12 @@ from src.agents.base import BaseAgent
 from src.agents.protocol import AgentMessage
 from src.llm.client import LLMClient
 from src.mcp_client.client import MCPClient
+from src.skills.loader import augment_prompt
 
 logger = logging.getLogger(__name__)
 
-CHECKER_SYSTEM_PROMPT = """\
+CHECKER_SYSTEM_PROMPT = augment_prompt(
+    """\
 You are the Checker Agent in a Data Incident Response system.
 Given a candidate root cause and the original assertion failure, your job is to:
 1. Retrieve the candidate's metadata (assertions, schema, freshness, documents)
@@ -27,7 +29,9 @@ Given a candidate root cause and the original assertion failure, your job is to:
 5. Check if the candidate has freshness issues
 6. Search for any incident documents related to this dataset
 7. Return a validation result: confirmed, probable, or rejected, with reasoning
-"""
+""",
+    "datahub-quality",
+)
 
 
 class ValidationStatus(str, Enum):

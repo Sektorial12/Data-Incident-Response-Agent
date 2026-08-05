@@ -11,10 +11,12 @@ from typing import Any
 from src.agents.base import BaseAgent
 from src.agents.protocol import AgentMessage
 from src.mcp_client.client import MCPClient
+from src.skills.loader import augment_prompt
 
 logger = logging.getLogger(__name__)
 
-REPORTER_SYSTEM_PROMPT = """\
+REPORTER_SYSTEM_PROMPT = augment_prompt(
+    """\
 You are the Reporter Agent in a Data Incident Response system.
 Given an incident with validated root causes, your job is to:
 1. Generate a comprehensive incident report in markdown
@@ -23,7 +25,9 @@ Given an incident with validated root causes, your job is to:
 3. Save the report as a document on the failing dataset in DataHub
 4. Tag the root cause dataset with "incident-root-cause" tag
 5. Update the failing dataset's description to reference the incident
-"""
+""",
+    "datahub-enrich",
+)
 
 
 class ReporterAgent(BaseAgent):
