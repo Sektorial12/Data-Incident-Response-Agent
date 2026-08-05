@@ -27,8 +27,9 @@ class LLMClient:
     Detects available provider from environment variables:
     - ANTHROPIC_API_KEY  -> ChatAnthropic (Claude)
     - OPENAI_API_KEY     -> ChatOpenAI (GPT-4, etc.)
+    - GOOGLE_API_KEY     -> ChatGoogleGenerativeAI (Gemini)
 
-    If neither is set, is_available() returns False and agents
+    If none is set, is_available() returns False and agents
     fall back to heuristic-only mode.
     """
 
@@ -49,6 +50,8 @@ class LLMClient:
             return "claude-3-5-sonnet-20241022"
         if provider == "openai":
             return "gpt-4o"
+        if provider == "google":
+            return "gemini-flash-lite-latest"
         return "unknown"
 
     def _init_chat_model(self) -> None:
@@ -75,6 +78,18 @@ class LLMClient:
                 )
                 logger.info(
                     "LLMClient initialized — provider: openai, model: %s", self.model
+                )
+
+            elif self.provider == "google":
+                from langchain_google_genai import ChatGoogleGenerativeAI
+
+                self._chat_model = ChatGoogleGenerativeAI(
+                    model=self.model,
+                    temperature=self.temperature,
+                    max_tokens=4096,
+                )
+                logger.info(
+                    "LLMClient initialized — provider: google, model: %s", self.model
                 )
 
             else:
@@ -109,7 +124,17 @@ class LLMClient:
                 HumanMessage(content=user_context),
             ]
             response = self._chat_model.invoke(messages)
-            return response.content if hasattr(response, "content") else str(response)
+            content = response.content if hasattr(response, "content") else str(response)
+            # Google Gemini returns content as a list of part dicts: [{'type': 'text', 'text': '...'}]
+            if isinstance(content, list):
+                parts = []
+                for part in content:
+                    if isinstance(part, dict) and "text" in part:
+                        parts.append(part["text"])
+                    elif isinstance(part, str):
+                        parts.append(part)
+                return "".join(parts)
+            return str(content)
         except Exception as e:
             logger.error("LLM assessment failed: %s", e)
             return None
@@ -125,8 +150,14 @@ class LLMClient:
         text = self.assess(system_prompt, user_context)
         if text is None:
             return None
+        # Strip markdown code fences (Gemini often wraps JSON in ```json ... ```)
+        stripped = text.strip()
+        if stripped.startswith("```"):
+            lines = stripped.split("\n")
+            lines = [l for l in lines if not l.strip().startswith("```")]
+            stripped = "\n".join(lines)
         try:
-            return json.loads(text)
+            return json.loads(stripped)
         except (json.JSONDecodeError, TypeError):
             logger.warning(
                 "LLM response was not valid JSON, returning raw text in 'reasoning'"
@@ -142,11 +173,14 @@ class LLMClient:
         Priority:
         1. ANTHROPIC_API_KEY  -> Anthropic
         2. OPENAI_API_KEY     -> OpenAI
-        3. Neither            -> unavailable (is_available() returns False)
+        3. GOOGLE_API_KEY     -> Google (Gemini)
+        4. None               -> unavailable (is_available() returns False)
         """
         if os.getenv("ANTHROPIC_API_KEY"):
             return cls(provider="anthropic", model=model, temperature=temperature)
         if os.getenv("OPENAI_API_KEY"):
             return cls(provider="openai", model=model, temperature=temperature)
+        if os.getenv("GOOGLE_API_KEY"):
+            return cls(provider="google", model=model, temperature=temperature)
         logger.info("No LLM API key found — agents will use heuristic-only mode")
         return cls(provider="none")

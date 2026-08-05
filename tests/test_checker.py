@@ -38,6 +38,14 @@ def make_mcp_mock(
     return mcp
 
 
+def make_noop_llm() -> MagicMock:
+    """Mock LLM that reports unavailable so tests use heuristic-only mode."""
+    llm = MagicMock()
+    llm.is_available.return_value = False
+    llm.assess_json.return_value = None
+    return llm
+
+
 def make_message(candidates: list[dict]) -> AgentMessage:
     return AgentMessage(
         from_agent="coordinator",
@@ -50,7 +58,7 @@ def make_message(candidates: list[dict]) -> AgentMessage:
 class TestCheckerAgent:
     def test_no_candidates_returns_empty(self):
         mcp = make_mcp_mock()
-        agent = CheckerAgent(mcp)
+        agent = CheckerAgent(mcp, llm_client=make_noop_llm())
         result = agent.run(make_message([]))
         assert result.is_completed
         assert result.result["validated_candidates"] == []
@@ -58,7 +66,7 @@ class TestCheckerAgent:
     def test_confirmed_with_failed_assertions(self):
         aspects = {CANDIDATE_URN_1: [{"name": "assertionRunEvents"}]}
         mcp = make_mcp_mock(entity_aspects=aspects, search_docs=2)
-        agent = CheckerAgent(mcp)
+        agent = CheckerAgent(mcp, llm_client=make_noop_llm())
         candidates = [{"urn": CANDIDATE_URN_1, "confidence": 0.5}]
         result = agent.run(make_message(candidates))
         assert result.is_completed
@@ -68,7 +76,7 @@ class TestCheckerAgent:
 
     def test_rejected_with_no_evidence(self):
         mcp = make_mcp_mock()
-        agent = CheckerAgent(mcp)
+        agent = CheckerAgent(mcp, llm_client=make_noop_llm())
         candidates = [{"urn": CANDIDATE_URN_1, "confidence": 0.1}]
         result = agent.run(make_message(candidates))
         assert result.is_completed
@@ -78,7 +86,7 @@ class TestCheckerAgent:
     def test_probable_with_schema_change(self):
         aspects = {CANDIDATE_URN_1: [{"name": "schemaMetadata"}]}
         mcp = make_mcp_mock(entity_aspects=aspects)
-        agent = CheckerAgent(mcp)
+        agent = CheckerAgent(mcp, llm_client=make_noop_llm())
         candidates = [{"urn": CANDIDATE_URN_1, "confidence": 0.4}]
         result = agent.run(make_message(candidates))
         validated = result.result["validated_candidates"]
@@ -91,7 +99,7 @@ class TestCheckerAgent:
             CANDIDATE_URN_2: [],
         }
         mcp = make_mcp_mock(entity_aspects=aspects)
-        agent = CheckerAgent(mcp)
+        agent = CheckerAgent(mcp, llm_client=make_noop_llm())
         candidates = [
             {"urn": CANDIDATE_URN_1, "confidence": 0.5},
             {"urn": CANDIDATE_URN_2, "confidence": 0.1},
@@ -107,7 +115,7 @@ class TestCheckerAgent:
         mcp = MagicMock(spec=MCPClient)
         mcp.get_entities.side_effect = RuntimeError("connection failed")
         mcp.search.return_value = {"entities": []}
-        agent = CheckerAgent(mcp)
+        agent = CheckerAgent(mcp, llm_client=make_noop_llm())
         candidates = [{"urn": CANDIDATE_URN_1, "confidence": 0.3}]
         result = agent.run(make_message(candidates))
         assert result.is_completed
@@ -122,7 +130,7 @@ class TestCheckerAgent:
             ]
         }
         mcp = make_mcp_mock(entity_aspects=aspects, search_docs=3)
-        agent = CheckerAgent(mcp)
+        agent = CheckerAgent(mcp, llm_client=make_noop_llm())
         candidates = [{"urn": CANDIDATE_URN_1, "confidence": 0.9}]
         result = agent.run(make_message(candidates))
         validated = result.result["validated_candidates"]
