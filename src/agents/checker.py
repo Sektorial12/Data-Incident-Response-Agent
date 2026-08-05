@@ -195,11 +195,52 @@ class CheckerAgent(BaseAgent):
         )
 
     def _extract_entity_info(
-        self, entities_result: dict[str, Any], urn: str
+        self, entities_result: dict[str, Any] | list[Any], urn: str
     ) -> dict[str, Any]:
-        """Extract relevant info from get_entities response."""
+        """Extract relevant info from get_entities response.
+
+        Handles MCP server format (list of entity dicts with direct fields)
+        and legacy format (dict with "entities" key containing aspect-based data).
+        """
         info: dict[str, Any] = {}
 
+        # MCP server returns a list of entity dicts
+        if isinstance(entities_result, list):
+            for entity in entities_result:
+                if isinstance(entity, dict) and entity.get("urn") == urn:
+                    info["name"] = entity.get("name", "")
+
+                    # Check health for failed assertions
+                    health = entity.get("health")
+                    if isinstance(health, dict):
+                        status = health.get("status", "")
+                        if status.upper() in ("FAIL", "FAILED", "ERROR"):
+                            info["has_failed_assertions"] = True
+
+                    # Check schema for recent modifications
+                    schema = entity.get("schemaMetadata")
+                    if isinstance(schema, dict):
+                        info["recently_modified"] = True
+
+                    # Properties for freshness
+                    properties = entity.get("properties", {})
+                    if isinstance(properties, dict) and properties:
+                        info["freshness_stale"] = False
+
+                    # Tags
+                    tags = entity.get("tags", {})
+                    if isinstance(tags, dict):
+                        tag_list = tags.get("tags", [])
+                        info["tags"] = [
+                            t.get("tag", {}).get("urn", "")
+                            for t in tag_list
+                            if isinstance(t, dict)
+                        ]
+
+                    break
+            return info
+
+        # Legacy format: dict with "entities" key
         if isinstance(entities_result, dict):
             entities = entities_result.get("entities", [])
             for entity in entities:
@@ -219,8 +260,23 @@ class CheckerAgent(BaseAgent):
         return info
 
     def _count_related_documents(self, search_result: dict[str, Any], urn: str) -> int:
-        """Count documents related to this URN in search results."""
+        """Count documents related to this URN in search results.
+
+        Handles MCP server format with 'searchResults' key
+        and legacy format with 'entities' key.
+        """
         if isinstance(search_result, dict):
+            # MCP server search format
+            search_results = search_result.get("searchResults", [])
+            if search_results:
+                return sum(
+                    1
+                    for e in search_results
+                    if isinstance(e, dict)
+                    and "document" in e.get("entity", {}).get("urn", "").lower()
+                )
+
+            # Legacy format
             entities = search_result.get("entities", [])
             return sum(
                 1

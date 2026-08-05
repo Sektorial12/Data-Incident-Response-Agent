@@ -132,11 +132,12 @@ class MCPClient:
     def get_lineage(
         self, urn: str, direction: str = "UPSTREAM", max_hops: int = 3
     ) -> dict[str, Any]:
+        upstream = direction.upper() == "UPSTREAM"
         return self.call_tool(
             "get_lineage",
             {
                 "urn": urn,
-                "direction": direction,
+                "upstream": upstream,
                 "max_hops": max_hops,
             },
         )
@@ -180,9 +181,12 @@ class MCPClient:
             "add_tags", {"tag_urns": tag_urns, "entity_urns": entity_urns}
         )
 
-    def update_description(self, urn: str, description: str) -> dict[str, Any]:
+    def update_description(
+        self, urn: str, description: str, operation: str = "replace"
+    ) -> dict[str, Any]:
         return self.call_tool(
-            "update_description", {"urn": urn, "description": description}
+            "update_description",
+            {"entity_urn": urn, "operation": operation, "description": description},
         )
 
     def close(self) -> None:
@@ -192,6 +196,9 @@ class MCPClient:
 
     @staticmethod
     def _extract_result(result: Any) -> dict[str, Any]:
+        # FastMCP returns a ToolResult object with a .content list
+        if hasattr(result, "content") and isinstance(result.content, list):
+            result = result.content
         if isinstance(result, list) and result:
             item = result[0]
             if hasattr(item, "text"):

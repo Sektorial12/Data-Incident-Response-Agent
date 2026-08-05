@@ -119,10 +119,28 @@ class TracerAgent(BaseAgent):
         return candidates
 
     def _extract_upstream_nodes(self, lineage_result: dict[str, Any]) -> list[str]:
-        """Extract URNs of upstream nodes from lineage response."""
+        """Extract URNs of upstream nodes from lineage response.
+
+        Handles MCP server format: {"upstreams": {"searchResults": [{"entity": {"urn": ...}}]}}
+        Also handles legacy format with "relationships" and "entities" keys.
+        """
         nodes: list[str] = []
 
         if isinstance(lineage_result, dict):
+            # MCP server format: searchResults under "upstreams" or "downstreams"
+            for direction_key in ("upstreams", "downstreams"):
+                direction_data = lineage_result.get(direction_key)
+                if isinstance(direction_data, dict):
+                    search_results = direction_data.get("searchResults", [])
+                    for sr in search_results:
+                        if isinstance(sr, dict):
+                            entity = sr.get("entity", {})
+                            if isinstance(entity, dict):
+                                urn = entity.get("urn")
+                                if urn and urn not in nodes:
+                                    nodes.append(urn)
+
+            # Legacy format: relationships / entities at top level
             relationships = lineage_result.get("relationships", [])
             for rel in relationships:
                 if isinstance(rel, dict):
@@ -203,11 +221,71 @@ class TracerAgent(BaseAgent):
         )
 
     def _extract_entity_info(
-        self, entities_result: dict[str, Any], urn: str
+        self, entities_result: dict[str, Any] | list[Any], urn: str
     ) -> dict[str, Any]:
-        """Extract relevant info from get_entities response."""
+        """Extract relevant info from get_entities response.
+
+        Handles MCP server format (list of entity dicts with direct fields)
+        and legacy format (dict with "entities" key containing aspect-based data).
+        """
         info: dict[str, Any] = {}
 
+        # MCP server returns a list of entity dicts
+        if isinstance(entities_result, list):
+            for entity in entities_result:
+                if isinstance(entity, dict) and entity.get("urn") == urn:
+                    info["name"] = entity.get("name") or entity.get(
+                        "qualifiedName", ""
+                    )
+                    platform = entity.get("platform")
+                    if isinstance(platform, dict):
+                        info["platform"] = platform.get("name", "")
+                    else:
+                        info["platform"] = platform
+
+                    # Check health for failed assertions
+                    health = entity.get("health")
+                    if isinstance(health, dict):
+                        status = health.get("status", "")
+                        if status.upper() in ("FAIL", "FAILED", "ERROR"):
+                            info["has_failed_assertions"] = True
+
+                    # Check schema for recent modifications
+                    schema = entity.get("schemaMetadata")
+                    if isinstance(schema, dict):
+                        info["recently_modified"] = True
+                        created_time = schema.get("createdAt")
+                        if created_time:
+                            import time as _time
+
+                            age_seconds = (_time.time() * 1000 - created_time) / 1000
+                            if age_seconds < 86400 * 7:
+                                info["recently_created"] = True
+
+                    # Check tags
+                    tags = entity.get("tags", {})
+                    if isinstance(tags, dict):
+                        tag_list = tags.get("tags", [])
+                        info["tags"] = [
+                            t.get("tag", {}).get("urn", "")
+                            for t in tag_list
+                            if isinstance(t, dict)
+                        ]
+
+                    # Check ownership
+                    ownership = entity.get("ownership", {})
+                    if isinstance(ownership, dict):
+                        owners = ownership.get("owners", [])
+                        info["owners"] = [
+                            o.get("owner", {}).get("urn", "")
+                            for o in owners
+                            if isinstance(o, dict)
+                        ]
+
+                    break
+            return info
+
+        # Legacy format: dict with "entities" key
         if isinstance(entities_result, dict):
             entities = entities_result.get("entities", [])
             for entity in entities:

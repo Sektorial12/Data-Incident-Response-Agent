@@ -93,7 +93,7 @@ class ReporterAgent(BaseAgent):
             for rc_urn in root_cause_urns:
                 try:
                     incident_ref = f"\n\n---\n**Incident Report:** {document_urn or 'N/A'} ({timestamp})\n"
-                    self.mcp.update_description(rc_urn, incident_ref)
+                    self.mcp.update_description(rc_urn, incident_ref, operation="append")
                     self.logger.debug("Updated description for %s", rc_urn)
                 except Exception as e:
                     self.logger.warning(
