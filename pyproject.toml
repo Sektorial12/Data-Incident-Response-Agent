@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "data-incident-response-agent"
+version = "0.1.0"
+description = "Event-driven multi-agent system for autonomous data incident response via DataHub"
+readme = "README.md"
+license = {text = "Apache-2.0"}
+requires-python = ">=3.11"
+dependencies = [
+    "acryl-datahub>=0.12.1",
+    "datahub-agent-context>=0.0.1",
+    "mcp-server-datahub>=0.5.3",
+    "fastmcp>=2.0.0",
+    "langchain>=0.2.0",
+    "langchain-anthropic>=0.1.0",
+    "langchain-openai>=0.1.0",
+    "langchain-google-genai>=4.0.0",
+    "datahub-actions>=0.0.6",
+    "python-dotenv>=1.0.0",
+    "pyyaml>=6.0",
+    "httpx>=0.27.0",
+    "rich>=13.0.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+]
+
+[project.scripts]
+incident-response = "src.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

@@ -1,6 +1,11 @@
 # Agent Configuration
 llm:
-  model: "claude-3-5-sonnet-20241022"
+  # Model is auto-detected from environment variables:
+  # ANTHROPIC_API_KEY -> claude-3-5-sonnet-20241022
+  # OPENAI_API_KEY    -> gpt-4o
+  # GOOGLE_API_KEY    -> gemini-flash-lite-latest
+  # If none set, falls back to heuristic-only mode
+  model: "auto"
   max_tokens: 4096
   temperature: 0.1
 

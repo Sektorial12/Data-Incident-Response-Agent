@@ -5,8 +5,11 @@ on the failing dataset, and tags the root cause dataset.
 """
 
 import logging
+import os
 from datetime import datetime, timezone
 from typing import Any
+
+import httpx
 
 from src.agents.base import BaseAgent
 from src.agents.protocol import AgentMessage
@@ -81,6 +84,7 @@ class ReporterAgent(BaseAgent):
         ]
         if root_cause_urns:
             try:
+                self._ensure_tag_exists("incident-root-cause")
                 self.mcp.add_tags(
                     tag_urns=["urn:li:tag:incident-root-cause"],
                     entity_urns=root_cause_urns,
@@ -205,6 +209,42 @@ class ReporterAgent(BaseAgent):
         )
 
         return "\n".join(lines)
+
+    def _ensure_tag_exists(self, tag_id: str) -> None:
+        """Create a tag in DataHub if it doesn't already exist.
+
+        Uses the DataHub GraphQL API directly since the MCP server
+        does not expose a create_tag tool.
+        """
+        server_url = os.getenv("DATAHUB_SERVER_URL", "http://localhost:8080")
+        token = os.getenv("DATAHUB_ACCESS_TOKEN", "")
+        mutation = """
+        mutation {
+            createTag(input: {
+                id: "%s",
+                name: "%s",
+                description: "Dataset identified as a root cause of a data quality incident"
+            })
+        }
+        """ % (tag_id, tag_id)
+        try:
+            resp = httpx.post(
+                f"{server_url}/api/graphql",
+                json={"query": mutation},
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json",
+                },
+                timeout=10,
+            )
+            if resp.status_code == 200:
+                self.logger.debug("Tag '%s' ensured", tag_id)
+            else:
+                self.logger.debug(
+                    "Tag ensure response: %s (tag may already exist)", resp.status_code
+                )
+        except Exception as e:
+            self.logger.debug("Tag ensure check (may already exist): %s", e)
 
     @staticmethod
     def _extract_dataset_name(urn: str) -> str:

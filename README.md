@@ -43,14 +43,26 @@ graph TD
 
 - **Coordinator** — Orchestrates the pipeline, dispatches to sub-agents, aggregates results
 - **Tracer** — Retrieves upstream lineage (up to 3 hops), evaluates each node for root cause indicators (failed assertions, schema changes, freshness issues), returns ranked candidates with confidence scores
-- **Checker** — Validates each candidate by examining metadata, checking for failed assertions, schema modifications, and related documents. Returns confirmed/probable/rejected status
+- **Checker** — Validates each candidate by examining metadata, checking for failed assertions, schema modifications, and related documents. Returns confirmed/probable/rejected status. Optionally uses LLM reasoning to adjust confidence
 - **Notifier** — Formats a Slack alert with dataset name, assertion details, root cause candidates, confidence scores, and DataHub UI link
 - **Reporter** — Generates a markdown incident report (summary, root cause analysis, lineage path, recommended actions) and writes it back to DataHub as a document. Tags root cause datasets
+
+## LLM Support
+
+The Checker agent can use an LLM to reason about root cause candidates. Any one of the following providers is supported (checked in this order):
+
+| Provider | Env Var | Default Model |
+|----------|---------|---------------|
+| Anthropic | `ANTHROPIC_API_KEY` | `claude-3-5-sonnet-20241022` |
+| OpenAI | `OPENAI_API_KEY` | `gpt-4o` |
+| Google | `GOOGLE_API_KEY` | `gemini-flash-lite-latest` |
+
+If no API key is set, agents fall back to heuristic-only mode (still functional, just no LLM reasoning enrichment).
 
 ## DataHub Capabilities Used
 
 - DataHub Actions (event-driven automation)
-- MCP Server (15+ tools, mutations enabled)
+- MCP Server (15+ tools, mutations enabled) — used in-process via FastMCP
 - DataHub Skills (lineage, quality, enrich)
 - `get_lineage` (multi-hop UPSTREAM)
 - `get_lineage_paths_between` (precise A-to-B path finding)
@@ -60,29 +72,66 @@ graph TD
 - `search_documents` (existing incident search)
 - Service Accounts with Default Views
 
+## Prerequisites
+
+1. **DataHub** running with Docker Compose quickstart:
+   ```bash
+   git clone https://github.com/datahub-project/datahub.git
+   cd datahub
+   docker compose -p datahub -f docker-compose.yml -f docker-compose.quickstart.yml up -d
+   ```
+   - GMS on `http://localhost:8080`
+   - Frontend on `http://localhost:9002`
+   - Kafka on `localhost:9092`
+
+2. **DataHub access token** — generate from DataHub UI: Settings > Access Tokens
+
+3. **Python 3.11+**
+
 ## Quick Start
 
 ```bash
 # Clone
 git clone https://github.com/Sektorial12/data-incident-response-agent.git
-cd data-incident-response-agent
+cd data-incident-response-agent/code
 
-# Copy env
+# Copy env and fill in values
 cp .env.example .env
-# Edit .env with your credentials
+# Edit .env — at minimum set DATAHUB_ACCESS_TOKEN and DATAHUB_SERVICE_ACCOUNT_TOKEN
 
-# Install dependencies
-pip install -r requirements.txt
+# Install
+pip install -e .
 
-# Run
+# Run tests (92 tests)
+python -m pytest tests/ -v
+
+# Start the agent (launches DataHub Actions listener)
 python src/main.py
 ```
 
-## Docker
+The agent now listens for assertion failure events on Kafka. When an assertion fails, the full pipeline executes automatically.
 
-```bash
-docker-compose up -d
-```
+## Configuration
+
+### `.env` file
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DATAHUB_SERVER_URL` | yes | GMS URL (default: `http://localhost:8080`) |
+| `DATAHUB_FRONTEND_URL` | yes | Frontend URL (default: `http://localhost:9002`) |
+| `DATAHUB_ACCESS_TOKEN` | yes | Personal access token |
+| `DATAHUB_SERVICE_ACCOUNT_TOKEN` | yes | Service account token for MCP server |
+| `TOOLS_IS_MUTATION_ENABLED` | yes | Must be `true` for write-back (tags, documents) |
+| `SLACK_WEBHOOK_URL` | no | Slack incoming webhook for alerts |
+| `ANTHROPIC_API_KEY` | no | Anthropic API key (highest priority) |
+| `OPENAI_API_KEY` | no | OpenAI API key |
+| `GOOGLE_API_KEY` | no | Google Gemini API key (lowest priority) |
+
+### Config files
+
+- `config/actions_config.yaml` — DataHub Actions plugin config (Kafka source, event filter, callback)
+- `config/agent_config.yaml` — Agent settings (lineage hops, confidence thresholds, timeouts)
+- `config/datahub_config.yaml` — DataHub connection settings
 
 ## Demo
 
@@ -90,7 +139,7 @@ docker-compose up -d
 2. Trigger: insert NULL into patient_id column
 3. Agent detects assertion failure via DataHub Actions
 4. Tracer agent traces 3-hop upstream lineage to find root cause
-5. Checker agent validates hypothesis
+5. Checker agent validates hypothesis (with LLM reasoning if configured)
 6. Slack alert sent with root cause + lineage path
 7. Incident report written to DataHub
 

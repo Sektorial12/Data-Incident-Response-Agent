@@ -4,11 +4,15 @@ datahub-agent-context>=0.0.1
 
 # MCP Server
 mcp-server-datahub>=0.5.3
+fastmcp>=2.0.0
 
 # Agent Framework
 langchain>=0.2.0
+
+# LLM Providers (install the one you use)
 langchain-anthropic>=0.1.0
-anthropic>=0.40.0
+langchain-openai>=0.1.0
+langchain-google-genai>=4.0.0
 
 # DataHub Actions
 datahub-actions>=0.0.6
