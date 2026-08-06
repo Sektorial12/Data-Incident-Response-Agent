@@ -16,7 +16,6 @@ from src.datahub_actions_plugin.filters import is_assertion_failure_event
 from src.datahub_actions_plugin.incident_event import IncidentEvent
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
 
 class IncidentResponseAction(Action):

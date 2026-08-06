@@ -78,17 +78,17 @@ def create_assertion(req: CreateAssertionRequest) -> dict[str, Any]:
     from datahub.emitter.rest_emitter import DataHubRestEmitter
     from datahub.metadata.schema_classes import (
         AssertionInfoClass, DatasetAssertionInfoClass,
-        AssertionTypeClass, DatasetAssertionScopeClass, AssertionOperatorClass,
+        AssertionTypeClass, DatasetAssertionScopeClass, AssertionStdOperatorClass,
     )
     url = os.getenv("DATAHUB_SERVER_URL", "http://localhost:8080")
     token = os.getenv("DATAHUB_ACCESS_TOKEN", "")
     assertion_urn = f"urn:li:assertion:{req.assertion_id}"
-    op_map = {"EQUAL_TO": AssertionOperatorClass.EQUAL_TO, "NOT_EQUAL_TO": AssertionOperatorClass.NOT_EQUAL_TO,
-              "GREATER_THAN": AssertionOperatorClass.GREATER_THAN, "LESS_THAN": AssertionOperatorClass.LESS_THAN}
-    op = op_map.get(req.operator.upper(), AssertionOperatorClass.EQUAL_TO)
-    atype = getattr(AssertionTypeClass, req.type.upper(), AssertionTypeClass.DATASET_ROWS)
+    op_map = {"EQUAL_TO": AssertionStdOperatorClass.EQUAL_TO, "NOT_EQUAL_TO": AssertionStdOperatorClass.NOT_EQUAL_TO,
+              "GREATER_THAN": AssertionStdOperatorClass.GREATER_THAN, "LESS_THAN": AssertionStdOperatorClass.LESS_THAN}
+    op = op_map.get(req.operator.upper(), AssertionStdOperatorClass.EQUAL_TO)
+    atype = getattr(AssertionTypeClass, {"DATASET_ROWS": "DATASET", "DATASET_SCHEMA": "DATA_SCHEMA", "FIELD": "FIELD", "FRESHNESS": "FRESHNESS", "VOLUME": "VOLUME", "SQL": "SQL", "CUSTOM": "CUSTOM"}.get(req.type.upper(), "DATASET"), AssertionTypeClass.DATASET)
     try:
-        info = DatasetAssertionInfoClass(dataset=req.dataset_urn, scope=DatasetAssertionScopeClass.DATASET, operator=op, type=atype, aggregationType=None, parameters=None)
+        info = DatasetAssertionInfoClass(dataset=req.dataset_urn, scope=DatasetAssertionScopeClass.DATASET_ROWS, operator=op, fields=None, aggregation=None, parameters=None)
         aspect = AssertionInfoClass(type=atype, datasetAssertion=info)
         mcp = MetadataChangeProposalWrapper(entityUrn=assertion_urn, aspect=aspect)
         DataHubRestEmitter(gms_server=url, token=token).emit_mcp(mcp)
@@ -113,7 +113,7 @@ def trigger_failure(req: TriggerFailureRequest) -> dict[str, Any]:
             assertionUrn=req.assertion_urn, asserteeUrn=req.dataset_urn,
             runId=run_id, timestampMillis=int(time.time() * 1000),
             status=AssertionRunStatusClass.COMPLETE,
-            result=AssertionResultClass(type=AssertionResultTypeClass.FAILURE, rowCount=1500, actualAggValue=req.actual_value),
+            result=AssertionResultClass(type=AssertionResultTypeClass.FAILURE, rowCount=1500, actualAggValue=float(req.actual_value) if req.actual_value else None),
         )
         mcp = MetadataChangeProposalWrapper(entityUrn=req.assertion_urn, aspect=event)
         DataHubRestEmitter(gms_server=url, token=token).emit_mcp(mcp)
