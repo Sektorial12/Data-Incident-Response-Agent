@@ -54,7 +54,7 @@ def _datahub_headers() -> dict[str, str]:
 @router.get("/assertions")
 def list_assertions() -> dict[str, Any]:
     url = os.getenv("DATAHUB_SERVER_URL", "http://localhost:8080")
-    query = '{searchAcrossEntities(input:{types:[ASSERTION],query:"*",start:0,count:50,orFilters:[{and:[{field:"removed",condition:"EQUAL",values:["true"],negated:True}]}]}){searchResults{entity{urn type ...on Assertion{info{type datasetAssertion{dataset scope operator}}}}}}}'
+    query = '{searchAcrossEntities(input:{types:[ASSERTION],query:"*",start:0,count:50}){searchResults{entity{urn type ...on Assertion{info{type datasetAssertion{datasetUrn scope operator}}}}}}}'
     try:
         resp = requests.post(f"{url}/api/graphql", json={"query": query}, headers=_datahub_headers(), timeout=15)
         resp.raise_for_status()
@@ -66,7 +66,7 @@ def list_assertions() -> dict[str, Any]:
             e = (r or {}).get("entity", {}) or {}
             info = e.get("info", {}) or {}
             da = info.get("datasetAssertion", {}) or {}
-            assertions.append({"urn": e.get("urn", ""), "type": info.get("type", ""), "dataset": da.get("dataset", ""), "operator": da.get("operator", "")})
+            assertions.append({"urn": e.get("urn", ""), "type": info.get("type", ""), "dataset": da.get("datasetUrn", ""), "operator": da.get("operator", "")})
         return {"assertions": assertions, "total": len(assertions)}
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
