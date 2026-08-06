@@ -26,7 +26,7 @@ def is_assertion_failure_event(event: EventEnvelope) -> bool:
         return False
 
     payload = event.event if hasattr(event, "event") else {}
-    if not isinstance(payload, dict):
+    if not hasattr(payload, "get"):
         return False
 
     entity_type = payload.get("entityType", "")
@@ -43,7 +43,7 @@ def is_assertion_failure_event(event: EventEnvelope) -> bool:
         return False
 
     aspect = payload.get("aspect")
-    if not aspect or not isinstance(aspect, dict):
+    if not aspect or not hasattr(aspect, "get"):
         return False
 
     aspect_value_str = aspect.get("value")
@@ -56,5 +56,9 @@ def is_assertion_failure_event(event: EventEnvelope) -> bool:
         logger.debug("Could not parse aspect value as JSON")
         return False
 
-    status = aspect_value.get("status", "")
-    return status.upper() in ("FAILED", "ERROR")
+    result = aspect_value.get("result", {})
+    result_type = ""
+    if isinstance(result, dict):
+        result_type = result.get("type", "")
+
+    return result_type.upper() in ("FAILURE", "ERROR")

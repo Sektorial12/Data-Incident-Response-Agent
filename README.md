@@ -100,11 +100,11 @@ cp .env.example .env
 # Install
 pip install -e .
 
-# Run tests (126 tests)
+# Run tests (134 tests)
 python -m pytest tests/ -v
 
-# Start the agent (launches DataHub Actions listener)
-python src/main.py
+# Start the agent (launches API server + DataHub Actions listener)
+python -m src.main
 ```
 
 The agent now listens for assertion failure events on Kafka. When an assertion fails, the full pipeline executes automatically.
@@ -155,6 +155,11 @@ docker-compose up --build
 
 The dashboard polls the agent's FastAPI server at `/incidents`, `/stats`, and `/health`.
 
+The **Manage** tab provides full service control from the UI:
+- **Assertions** — list, create, and trigger test assertion failures in DataHub
+- **Config & Routing** — view/edit alert routing rules, Slack webhook URLs, dedup window
+- **Agent Control** — view agent status, restart or stop the DataHub Actions listener
+
 ### API Endpoints
 
 | Endpoint | Description |
@@ -164,6 +169,14 @@ The dashboard polls the agent's FastAPI server at `/incidents`, `/stats`, and `/
 | `GET /incidents?status=active&limit=50` | List incidents, optionally filtered by status |
 | `GET /incidents/{id}` | Single incident detail with agent results and root causes |
 | `GET /stats` | Aggregate metrics (total, active, resolved, avg MTTR) |
+| `GET /manage/assertions` | List assertions from DataHub |
+| `POST /manage/assertions` | Create a new dataset assertion in DataHub |
+| `POST /manage/assertions/trigger` | Emit a test assertion failure event |
+| `GET /manage/config` | View agent config (LLM, lineage, alert routing, env) |
+| `PUT /manage/config/routing` | Update alert routing rules and Slack config |
+| `GET /manage/agent/status` | Check if Actions listener is running |
+| `POST /manage/agent/restart` | Restart the DataHub Actions listener |
+| `POST /manage/agent/stop` | Stop the Actions listener |
 
 ## Configuration
 
@@ -203,7 +216,7 @@ The dashboard polls the agent's FastAPI server at `/incidents`, `/stats`, and `/
 ## Testing
 
 ```bash
-# Run all 126 tests
+# Run all 134 tests
 python -m pytest tests/ -v
 
 # Run specific agent tests
@@ -224,6 +237,7 @@ Test coverage:
 - **Skills Loader** (6 tests) — DataHub skill guidance loading, prompt augmentation, fallback
 - **Incident Store** (13 tests) — SQLite persistence, save/update/list, dedup lookup, metrics
 - **API Server** (10 tests) — Health, metrics, incidents list/filter, stats, dedup integration
+- **Management API** (8 tests) — Assertion listing/creation/trigger, config view/update, agent lifecycle
 - **Alert Router** (11 tests) — Platform/confidence matching, env var resolution, edge cases
 
 ## License

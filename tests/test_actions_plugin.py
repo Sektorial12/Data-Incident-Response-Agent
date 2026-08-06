@@ -28,11 +28,11 @@ def make_mcl_event(
 ) -> MockEventEnvelope:
     if aspect_value is None:
         aspect_value = {
-            "status": "FAILED",
+            "status": "COMPLETE",
             "asserteeUrn": "urn:li:dataset:(urn:li:dataPlatform:sqlite,healthcare.main.mart_billing,PROD)",
             "runId": "test-run-1",
             "timestampMillis": 1700000000000,
-            "result": {"errorMessage": "billing_amount has negative values"},
+            "result": {"type": "FAILURE", "errorMessage": "billing_amount has negative values"},
         }
     return MockEventEnvelope(
         event_type="MetadataChangeLogEvent_v1",
@@ -80,10 +80,11 @@ class TestEventFiltering:
         event = make_mcl_event(change_type="DELETE")
         assert is_assertion_failure_event(event) is False
 
-    def test_accepts_error_status(self):
+    def test_accepts_error_result_type(self):
         event = make_mcl_event(
             aspect_value={
-                "status": "ERROR",
+                "status": "COMPLETE",
+                "result": {"type": "ERROR"},
                 "asserteeUrn": "urn:li:dataset:test",
                 "timestampMillis": 1,
             }
@@ -99,7 +100,7 @@ class TestIncidentExtraction:
         incident = action._extract_incident(event)
         assert incident is not None
         assert incident.assertion_urn == "urn:li:assertion:test-assertion"
-        assert incident.result_status == "FAILED"
+        assert incident.result_status == "FAILURE"
         assert incident.run_id == "test-run-1"
         assert incident.timestamp_ms == 1700000000000
         assert incident.error_message == "billing_amount has negative values"
@@ -175,7 +176,7 @@ class TestActionDispatch:
         callback.assert_called_once()
         incident = callback.call_args[0][0]
         assert isinstance(incident, IncidentEvent)
-        assert incident.result_status == "FAILED"
+        assert incident.result_status == "FAILURE"
 
     def test_callback_not_invoked_on_non_failure(self):
         callback = MagicMock()

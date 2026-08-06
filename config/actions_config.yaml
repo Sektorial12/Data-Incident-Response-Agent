@@ -5,13 +5,10 @@ source:
   config:
     connection:
       bootstrap: ${KAFKA_BOOTSTRAP_SERVER:-localhost:9092}
-      schema_registry_url: ${SCHEMA_REGISTRY_URL:-http://localhost:8081}
+      schema_registry_url: ${SCHEMA_REGISTRY_URL:-http://localhost:8080/schema-registry/api/}
 
 filter:
   event_type: "MetadataChangeLogEvent_v1"
-  event:
-    entityType: "assertion"
-    aspectName: "assertionRunEvent"
 
 action:
   type: "src.datahub_actions_plugin.plugin:IncidentResponseAction"

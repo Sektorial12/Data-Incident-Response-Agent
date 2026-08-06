@@ -16,6 +16,7 @@ from src.datahub_actions_plugin.filters import is_assertion_failure_event
 from src.datahub_actions_plugin.incident_event import IncidentEvent
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 class IncidentResponseAction(Action):
@@ -93,12 +94,12 @@ class IncidentResponseAction(Action):
 
     def _extract_incident(self, event: EventEnvelope) -> IncidentEvent | None:
         payload = event.event if hasattr(event, "event") else {}
-        if not isinstance(payload, dict):
+        if not hasattr(payload, "get"):
             return None
 
         assertion_urn = payload.get("entityUrn", "")
         aspect = payload.get("aspect", {})
-        aspect_value_str = aspect.get("value", "{}")
+        aspect_value_str = aspect.get("value", "{}") if hasattr(aspect, "get") else "{}"
 
         try:
             aspect_value = json.loads(aspect_value_str)
@@ -107,6 +108,10 @@ class IncidentResponseAction(Action):
             return None
 
         status = aspect_value.get("status", "UNKNOWN")
+        result = aspect_value.get("result", {})
+        result_status = "UNKNOWN"
+        if isinstance(result, dict):
+            result_status = result.get("type", status)
         assertee_urn = aspect_value.get("asserteeUrn", "")
         run_id = aspect_value.get("runId", "")
         timestamp_ms = aspect_value.get("timestampMillis", 0)
@@ -120,7 +125,7 @@ class IncidentResponseAction(Action):
             assertion_urn=assertion_urn,
             dataset_urn=assertee_urn,
             assertion_type="DATASET_ROWS",
-            result_status=status,
+            result_status=result_status,
             timestamp_ms=timestamp_ms,
             run_id=run_id,
             error_message=error_message,

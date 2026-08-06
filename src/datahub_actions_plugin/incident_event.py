@@ -19,7 +19,7 @@ class IncidentEvent:
 
     @property
     def is_failure(self) -> bool:
-        return self.result_status.upper() in ("FAILED", "ERROR")
+        return self.result_status.upper() in ("FAILED", "FAILURE", "ERROR")
 
     def summary(self) -> str:
         return (

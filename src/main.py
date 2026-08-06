@@ -118,9 +118,12 @@ def main() -> None:
     logger.info("")
 
     try:
+        from src.api.management import set_agent_proc
         _actions_proc = subprocess.Popen(
             ["datahub", "actions", "-c", str(config_path)],
+            env=os.environ.copy(),
         )
+        set_agent_proc(_actions_proc)
         _actions_proc.wait()
     except FileNotFoundError:
         logger.error(

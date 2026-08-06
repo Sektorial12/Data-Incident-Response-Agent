@@ -13,7 +13,9 @@ import time
 from typing import Any
 
 from fastapi import FastAPI, Query
+from fastapi.middleware.cors import CORSMiddleware
 
+from src.api.management import router as management_router
 from src.store.incident_store import IncidentStore
 
 logger = logging.getLogger(__name__)
@@ -61,6 +63,13 @@ def record_llm_call(failed: bool = False) -> None:
 def create_app(store: IncidentStore | None = None) -> FastAPI:
     """Create the FastAPI app, optionally with a shared store."""
     app = FastAPI(title="Data Incident Response Agent", version="0.1.0")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    app.include_router(management_router)
     _store = store or IncidentStore()
 
     @app.get("/health")
