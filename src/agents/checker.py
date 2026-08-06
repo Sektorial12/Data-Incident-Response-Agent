@@ -11,6 +11,7 @@ from enum import Enum
 from typing import Any
 
 from src.agents.base import BaseAgent
+from src.agents.entity_utils import extract_entity_info
 from src.agents.protocol import AgentMessage
 from src.llm.client import LLMClient
 from src.mcp_client.client import MCPClient
@@ -71,6 +72,13 @@ class CheckerAgent(BaseAgent):
     ) -> None:
         super().__init__(mcp_client, config)
         self.confidence_threshold = self.config.get("confidence_threshold", 0.5)
+        self.confirmed_threshold = self.config.get("confirmed_threshold_override", 0.7)
+        self.weights = self.config.get("checker_weights", {
+            "failed_assertions": 0.3,
+            "recently_modified": 0.2,
+            "freshness_stale": 0.15,
+            "related_documents": 0.1,
+        })
         self.llm = llm_client or LLMClient.from_env()
 
     def run(self, message: AgentMessage) -> AgentMessage:
@@ -134,24 +142,24 @@ class CheckerAgent(BaseAgent):
 
         try:
             entities_result = self.mcp.get_entities([urn])
-            entity_info = self._extract_entity_info(entities_result, urn)
+            entity_info = extract_entity_info(entities_result, urn)
         except Exception as e:
             self.logger.debug("Could not get entities for %s: %s", urn, e)
             entity_info = {}
 
         if entity_info.get("has_failed_assertions"):
             evidence.append("candidate has its own failed assertions")
-            confidence += 0.3
+            confidence += self.weights["failed_assertions"]
             reasons.append("failed assertions on upstream node")
 
         if entity_info.get("recently_modified"):
             evidence.append("candidate schema was recently modified")
-            confidence += 0.2
+            confidence += self.weights["recently_modified"]
             reasons.append("schema modification detected")
 
         if entity_info.get("freshness_stale"):
             evidence.append("candidate has freshness issues")
-            confidence += 0.15
+            confidence += self.weights["freshness_stale"]
             reasons.append("freshness issues detected")
 
         try:
@@ -159,7 +167,7 @@ class CheckerAgent(BaseAgent):
             related_docs = self._count_related_documents(search_result, urn)
             if related_docs > 0:
                 evidence.append(f"found {related_docs} related documents")
-                confidence += 0.1
+                confidence += self.weights["related_documents"]
         except Exception as e:
             self.logger.debug("Search failed for %s: %s", urn, e)
 
@@ -175,7 +183,7 @@ class CheckerAgent(BaseAgent):
             if llm_text:
                 reasons.append(f"LLM: {llm_text}")
 
-        if confidence >= 0.7:
+        if confidence >= self.confirmed_threshold:
             status = ValidationStatus.CONFIRMED
         elif confidence >= self.confidence_threshold:
             status = ValidationStatus.PROBABLE
@@ -193,71 +201,6 @@ class CheckerAgent(BaseAgent):
             reasoning=reasoning,
             evidence=evidence,
         )
-
-    def _extract_entity_info(
-        self, entities_result: dict[str, Any] | list[Any], urn: str
-    ) -> dict[str, Any]:
-        """Extract relevant info from get_entities response.
-
-        Handles MCP server format (list of entity dicts with direct fields)
-        and legacy format (dict with "entities" key containing aspect-based data).
-        """
-        info: dict[str, Any] = {}
-
-        # MCP server returns a list of entity dicts
-        if isinstance(entities_result, list):
-            for entity in entities_result:
-                if isinstance(entity, dict) and entity.get("urn") == urn:
-                    info["name"] = entity.get("name", "")
-
-                    # Check health for failed assertions
-                    health = entity.get("health")
-                    if isinstance(health, dict):
-                        status = health.get("status", "")
-                        if status.upper() in ("FAIL", "FAILED", "ERROR"):
-                            info["has_failed_assertions"] = True
-
-                    # Check schema for recent modifications
-                    schema = entity.get("schemaMetadata")
-                    if isinstance(schema, dict):
-                        info["recently_modified"] = True
-
-                    # Properties for freshness
-                    properties = entity.get("properties", {})
-                    if isinstance(properties, dict) and properties:
-                        info["freshness_stale"] = False
-
-                    # Tags
-                    tags = entity.get("tags", {})
-                    if isinstance(tags, dict):
-                        tag_list = tags.get("tags", [])
-                        info["tags"] = [
-                            t.get("tag", {}).get("urn", "")
-                            for t in tag_list
-                            if isinstance(t, dict)
-                        ]
-
-                    break
-            return info
-
-        # Legacy format: dict with "entities" key
-        if isinstance(entities_result, dict):
-            entities = entities_result.get("entities", [])
-            for entity in entities:
-                if isinstance(entity, dict) and entity.get("urn") == urn:
-                    aspects = entity.get("aspects", [])
-                    for aspect in aspects:
-                        if isinstance(aspect, dict):
-                            name = aspect.get("name", "")
-                            if name == "assertionRunEvents":
-                                info["has_failed_assertions"] = True
-                            if name == "schemaMetadata":
-                                info["recently_modified"] = True
-                            if name == "datasetProperties":
-                                info["freshness_stale"] = False
-                    break
-
-        return info
 
     def _count_related_documents(self, search_result: dict[str, Any], urn: str) -> int:
         """Count documents related to this URN in search results.

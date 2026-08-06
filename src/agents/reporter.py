@@ -12,6 +12,7 @@ from typing import Any
 import httpx
 
 from src.agents.base import BaseAgent
+from src.agents.entity_utils import extract_dataset_name
 from src.agents.protocol import AgentMessage
 from src.mcp_client.client import MCPClient
 from src.skills.loader import augment_prompt
@@ -67,7 +68,7 @@ class ReporterAgent(BaseAgent):
         try:
             doc_result = self.mcp.save_document(
                 document_type="Note",
-                title=f"Incident Report — {self._extract_dataset_name(dataset_urn)}",
+                title=f"Incident Report — {extract_dataset_name(dataset_urn)}",
                 content=report,
                 related_assets=[dataset_urn],
             )
@@ -124,7 +125,7 @@ class ReporterAgent(BaseAgent):
     ) -> str:
         """Generate a markdown incident report."""
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-        dataset_name = self._extract_dataset_name(dataset_urn)
+        dataset_name = extract_dataset_name(dataset_urn)
 
         candidates = tracer_result.get("candidates", [])
         validated = checker_result.get("validated_candidates", [])
@@ -182,7 +183,7 @@ class ReporterAgent(BaseAgent):
                 conf = c.get("confidence", 0)
                 path = c.get("path", [])
                 path_str = (
-                    " -> ".join(self._extract_dataset_name(p) for p in path)
+                    " -> ".join(extract_dataset_name(p) for p in path)
                     if path
                     else "N/A"
                 )
@@ -219,18 +220,23 @@ class ReporterAgent(BaseAgent):
         server_url = os.getenv("DATAHUB_SERVER_URL", "http://localhost:8080")
         token = os.getenv("DATAHUB_ACCESS_TOKEN", "")
         mutation = """
-        mutation {
+        mutation ($id: String!, $name: String!, $description: String!) {
             createTag(input: {
-                id: "%s",
-                name: "%s",
-                description: "Dataset identified as a root cause of a data quality incident"
+                id: $id,
+                name: $name,
+                description: $description
             })
         }
-        """ % (tag_id, tag_id)
+        """
+        variables = {
+            "id": tag_id,
+            "name": tag_id,
+            "description": "Dataset identified as a root cause of a data quality incident"
+        }
         try:
             resp = httpx.post(
                 f"{server_url}/api/graphql",
-                json={"query": mutation},
+                json={"query": mutation, "variables": variables},
                 headers={
                     "Authorization": f"Bearer {token}",
                     "Content-Type": "application/json",
@@ -245,13 +251,3 @@ class ReporterAgent(BaseAgent):
                 )
         except Exception as e:
             self.logger.debug("Tag ensure check (may already exist): %s", e)
-
-    @staticmethod
-    def _extract_dataset_name(urn: str) -> str:
-        """Extract a human-readable name from a dataset URN."""
-        if "sqlite," in urn:
-            parts = urn.split("sqlite,")
-            if len(parts) > 1:
-                rest = parts[1].rstrip(")")
-                return rest.split(",")[0] if "," in rest else rest
-        return urn

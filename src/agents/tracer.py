@@ -9,6 +9,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from src.agents.base import BaseAgent
+from src.agents.entity_utils import extract_entity_info
 from src.agents.protocol import AgentMessage
 from src.mcp_client.client import MCPClient
 from src.skills.loader import augment_prompt
@@ -58,6 +59,14 @@ class TracerAgent(BaseAgent):
         super().__init__(mcp_client, config)
         self.max_hops = self.config.get("max_lineage_hops", 3)
         self.confidence_threshold = self.config.get("confidence_threshold", 0.05)
+        self.weights = self.config.get("tracer_weights", {
+            "failed_assertions": 0.5,
+            "recently_modified": 0.3,
+            "freshness_stale": 0.2,
+            "missing_lineage": 0.05,
+            "recently_created": 0.1,
+            "default_upstream": 0.1,
+        })
 
     def run(self, message: AgentMessage) -> AgentMessage:
         """Execute the tracing workflow."""
@@ -172,41 +181,35 @@ class TracerAgent(BaseAgent):
 
         try:
             entities_result = self.mcp.get_entities([node_urn])
-            entity_info = self._extract_entity_info(entities_result, node_urn)
+            entity_info = extract_entity_info(entities_result, node_urn)
         except Exception as e:
             self.logger.debug("Could not get entities for %s: %s", node_urn, e)
             entity_info = {}
 
-        try:
-            schema_result = self.mcp.list_schema_fields(node_urn)
-            self._count_schema_fields(schema_result)
-        except Exception as e:
-            self.logger.debug("Could not get schema for %s: %s", node_urn, e)
-
         if entity_info.get("has_failed_assertions"):
-            confidence += 0.5
+            confidence += self.weights["failed_assertions"]
             reasons.append("has failed assertions")
 
         if entity_info.get("recently_modified"):
-            confidence += 0.3
+            confidence += self.weights["recently_modified"]
             reasons.append("recently modified")
 
         if entity_info.get("freshness_stale"):
-            confidence += 0.2
+            confidence += self.weights["freshness_stale"]
             reasons.append("freshness stale")
 
         if entity_info.get("missing_lineage"):
-            confidence += 0.05
+            confidence += self.weights["missing_lineage"]
             reasons.append("incomplete lineage")
 
         if entity_info.get("recently_created"):
-            confidence += 0.1
+            confidence += self.weights["recently_created"]
             reasons.append("recently created node")
 
         confidence = min(confidence, 1.0)
 
         if not reasons:
-            confidence = 0.1
+            confidence = self.weights["default_upstream"]
             reasons.append("upstream node in lineage path")
 
         path = self._find_path(node_urn, failing_dataset_urn)
@@ -219,116 +222,6 @@ class TracerAgent(BaseAgent):
             name=entity_info.get("name"),
             platform=entity_info.get("platform"),
         )
-
-    def _extract_entity_info(
-        self, entities_result: dict[str, Any] | list[Any], urn: str
-    ) -> dict[str, Any]:
-        """Extract relevant info from get_entities response.
-
-        Handles MCP server format (list of entity dicts with direct fields)
-        and legacy format (dict with "entities" key containing aspect-based data).
-        """
-        info: dict[str, Any] = {}
-
-        # MCP server returns a list of entity dicts
-        if isinstance(entities_result, list):
-            for entity in entities_result:
-                if isinstance(entity, dict) and entity.get("urn") == urn:
-                    info["name"] = entity.get("name") or entity.get(
-                        "qualifiedName", ""
-                    )
-                    platform = entity.get("platform")
-                    if isinstance(platform, dict):
-                        info["platform"] = platform.get("name", "")
-                    else:
-                        info["platform"] = platform
-
-                    # Check health for failed assertions
-                    health = entity.get("health")
-                    if isinstance(health, dict):
-                        status = health.get("status", "")
-                        if status.upper() in ("FAIL", "FAILED", "ERROR"):
-                            info["has_failed_assertions"] = True
-
-                    # Check schema for recent modifications
-                    schema = entity.get("schemaMetadata")
-                    if isinstance(schema, dict):
-                        info["recently_modified"] = True
-                        created_time = schema.get("createdAt")
-                        if created_time:
-                            import time as _time
-
-                            age_seconds = (_time.time() * 1000 - created_time) / 1000
-                            if age_seconds < 86400 * 7:
-                                info["recently_created"] = True
-
-                    # Check tags
-                    tags = entity.get("tags", {})
-                    if isinstance(tags, dict):
-                        tag_list = tags.get("tags", [])
-                        info["tags"] = [
-                            t.get("tag", {}).get("urn", "")
-                            for t in tag_list
-                            if isinstance(t, dict)
-                        ]
-
-                    # Check ownership
-                    ownership = entity.get("ownership", {})
-                    if isinstance(ownership, dict):
-                        owners = ownership.get("owners", [])
-                        info["owners"] = [
-                            o.get("owner", {}).get("urn", "")
-                            for o in owners
-                            if isinstance(o, dict)
-                        ]
-
-                    break
-            return info
-
-        # Legacy format: dict with "entities" key
-        if isinstance(entities_result, dict):
-            entities = entities_result.get("entities", [])
-            for entity in entities:
-                if isinstance(entity, dict) and entity.get("urn") == urn:
-                    info["name"] = entity.get("name") or entity.get("qualifiedName")
-                    info["platform"] = entity.get("platform")
-                    aspects = entity.get("aspects", [])
-                    aspect_names = set()
-                    for aspect in aspects:
-                        if isinstance(aspect, dict):
-                            aspect_name = aspect.get("name", "")
-                            aspect_names.add(aspect_name)
-                            if aspect_name == "assertionRunEvents":
-                                info["has_failed_assertions"] = True
-                            if aspect_name == "schemaMetadata":
-                                info["recently_modified"] = True
-                            if aspect_name == "datasetProperties":
-                                info["freshness_stale"] = False
-                            if aspect_name == "dataPlatformInfo":
-                                created = aspect.get("created", {})
-                                if isinstance(created, dict):
-                                    created_time = created.get("time")
-                                    if created_time:
-                                        import time as _time
-
-                                        age_seconds = (
-                                            _time.time() * 1000 - created_time
-                                        ) / 1000
-                                        if age_seconds < 86400 * 7:
-                                            info["recently_created"] = True
-
-                    if "upstreamLineage" not in aspect_names:
-                        info["missing_lineage"] = True
-                    break
-
-        return info
-
-    def _count_schema_fields(self, schema_result: dict[str, Any]) -> int:
-        """Count schema fields from list_schema_fields response."""
-        if isinstance(schema_result, dict):
-            fields = schema_result.get("fields", [])
-            return len(fields) if isinstance(fields, list) else 0
-        return 0
 
     def _find_path(self, source_urn: str, target_urn: str) -> list[str]:
         """Find lineage path between two URNs."""

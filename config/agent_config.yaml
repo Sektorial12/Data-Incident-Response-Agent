@@ -17,6 +17,21 @@ confidence:
   confirmed_threshold: 0.8
   probable_threshold: 0.5
   rejected_below: 0.5
+  # Tracer scoring weights (additive, capped at 1.0)
+  tracer_weights:
+    failed_assertions: 0.5
+    recently_modified: 0.3
+    freshness_stale: 0.2
+    missing_lineage: 0.05
+    recently_created: 0.1
+    default_upstream: 0.1
+  # Checker scoring adjustments (added to tracer confidence)
+  checker_weights:
+    failed_assertions: 0.3
+    recently_modified: 0.2
+    freshness_stale: 0.15
+    related_documents: 0.1
+  confirmed_threshold_override: 0.7
 
 timeout:
   agent_seconds: 30

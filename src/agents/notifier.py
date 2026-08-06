@@ -13,6 +13,7 @@ from typing import Any
 
 from src.agents.alert_router import AlertRouter
 from src.agents.base import BaseAgent
+from src.agents.entity_utils import extract_dataset_name
 from src.agents.protocol import AgentMessage
 from src.mcp_client.client import MCPClient
 
@@ -120,7 +121,7 @@ class NotifierAgent(BaseAgent):
     ) -> str:
         """Format the Slack alert message."""
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-        dataset_name = self._extract_dataset_name(dataset_urn)
+        dataset_name = extract_dataset_name(dataset_urn)
 
         lines: list[str] = [
             ":rotating_light: *Data Incident Detected*",
@@ -163,16 +164,6 @@ class NotifierAgent(BaseAgent):
         with urllib.request.urlopen(req, timeout=10) as resp:
             if resp.status != 200:
                 raise RuntimeError(f"Slack returned status {resp.status}")
-
-    @staticmethod
-    def _extract_dataset_name(urn: str) -> str:
-        """Extract a human-readable name from a dataset URN."""
-        if "sqlite," in urn:
-            parts = urn.split("sqlite,")
-            if len(parts) > 1:
-                rest = parts[1].rstrip(")")
-                return rest.split(",")[0] if "," in rest else rest
-        return urn
 
     @staticmethod
     def _url_encode(urn: str) -> str:

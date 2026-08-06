@@ -9,6 +9,7 @@ Runs alongside the DataHub Actions listener. Provides:
 """
 
 import logging
+import os
 import time
 from typing import Any
 
@@ -63,9 +64,17 @@ def record_llm_call(failed: bool = False) -> None:
 def create_app(store: IncidentStore | None = None) -> FastAPI:
     """Create the FastAPI app, optionally with a shared store."""
     app = FastAPI(title="Data Incident Response Agent", version="0.1.0")
+    allowed_origins = [
+        origin.strip()
+        for origin in os.getenv(
+            "CORS_ALLOWED_ORIGINS",
+            "http://localhost:3000,http://localhost:8081",
+        ).split(",")
+        if origin.strip()
+    ]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=allowed_origins,
         allow_methods=["*"],
         allow_headers=["*"],
     )

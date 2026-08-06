@@ -17,18 +17,6 @@ from src.store.incident_store import IncidentStore
 
 logger = logging.getLogger(__name__)
 
-COORDINATOR_SYSTEM_PROMPT = """\
-You are the Coordinator of a Data Incident Response Agent system.
-When you receive an incident event (assertion failure on a dataset),
-your job is to:
-1. Analyze the event: what dataset, what assertion, what failed
-2. Dispatch the Tracer Agent to trace upstream lineage and find root cause
-3. Dispatch the Checker Agent to validate each candidate root cause
-4. Dispatch the Notifier Agent to send a Slack alert
-5. Dispatch the Reporter Agent to write an incident report to DataHub
-6. Return a summary of the incident response
-"""
-
 
 class CoordinatorAgent:
     """Orchestrates the incident response by dispatching to sub-agents."""
