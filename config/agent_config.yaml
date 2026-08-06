@@ -34,3 +34,19 @@ agents:
     enabled: true
   reporter:
     enabled: true
+
+# Alert routing — route Slack alerts by severity or dataset platform.
+# Rules are evaluated top-to-bottom; first match wins.
+# If no rule matches, falls back to SLACK_WEBHOOK_URL env var.
+alert_routing:
+  dedup_window_seconds: 900
+  rules:
+    - name: "Critical data platform alerts"
+      match:
+        platform: ["snowflake", "bigquery", "redshift"]
+      webhook_url: "${SLACK_CRITICAL_WEBHOOK_URL}"
+    - name: "High confidence incidents"
+      match:
+        min_confidence: 0.8
+      webhook_url: "${SLACK_HIGH_PRIORITY_WEBHOOK_URL}"
+  default_webhook_url: "${SLACK_WEBHOOK_URL}"

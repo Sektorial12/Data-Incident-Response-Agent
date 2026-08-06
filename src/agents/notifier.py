@@ -11,6 +11,7 @@ import urllib.request
 from datetime import datetime, timezone
 from typing import Any
 
+from src.agents.alert_router import AlertRouter
 from src.agents.base import BaseAgent
 from src.agents.protocol import AgentMessage
 from src.mcp_client.client import MCPClient
@@ -46,6 +47,7 @@ class NotifierAgent(BaseAgent):
             "datahub_frontend_url",
             os.getenv("DATAHUB_FRONTEND_URL", "http://localhost:9002"),
         )
+        self.router = AlertRouter()
 
     def run(self, message: AgentMessage) -> AgentMessage:
         """Format and send the Slack alert."""
@@ -56,6 +58,23 @@ class NotifierAgent(BaseAgent):
         assertion_urn = message.context.get("assertion_urn", "")
         error_message = message.context.get("error_message", "")
 
+        max_confidence = max(
+            (c.get("confidence", 0) for c in candidates), default=0.0
+        )
+        platform = ""
+        for c in candidates:
+            urn = c.get("candidate_urn", c.get("urn", ""))
+            if "urn:li:dataset:" in urn:
+                parts = urn.replace("urn:li:dataset:", "").split(",")
+                if parts:
+                    platform = parts[0].strip("()")
+                break
+
+        webhook = self.router.select_webhook(
+            platform=platform or None,
+            confidence=max_confidence,
+        ) or self.webhook_url
+
         alert_text = self._format_alert(
             dataset_urn=dataset_urn,
             assertion_urn=assertion_urn,
@@ -63,7 +82,7 @@ class NotifierAgent(BaseAgent):
             candidates=candidates,
         )
 
-        if not self.webhook_url or "your/webhook" in self.webhook_url:
+        if not webhook or "your/webhook" in webhook:
             self.logger.warning("Slack webhook URL not configured — logging alert only")
             self.logger.info("Alert:\n%s", alert_text)
             message.mark_completed(
@@ -77,7 +96,7 @@ class NotifierAgent(BaseAgent):
             return message
 
         try:
-            self._send_slack(alert_text)
+            self._send_slack(alert_text, webhook)
             message.mark_completed({"notified": True, "alert_text": alert_text})
             self._log_complete(message)
         except Exception as e:
@@ -132,11 +151,11 @@ class NotifierAgent(BaseAgent):
 
         return "\n".join(lines)
 
-    def _send_slack(self, text: str) -> None:
+    def _send_slack(self, text: str, webhook_url: str) -> None:
         """Send a message to Slack via Incoming Webhook."""
         payload = json.dumps({"text": text, "mrkdwn": True}).encode("utf-8")
         req = urllib.request.Request(
-            self.webhook_url,
+            webhook_url,
             data=payload,
             headers={"Content-Type": "application/json"},
             method="POST",

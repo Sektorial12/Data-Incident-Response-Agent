@@ -67,6 +67,8 @@ class TestNotifierAgent:
     def test_logs_alert_when_webhook_not_configured(self):
         mcp = MagicMock(spec=MCPClient)
         agent = NotifierAgent(mcp, config={"slack_webhook_url": ""})
+        agent.router.default_webhook = ""
+        agent.router.rules = []
         result = agent.run(make_notifier_message())
         assert result.is_completed
         assert result.result["notified"] is False
