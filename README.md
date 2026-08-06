@@ -146,10 +146,10 @@ A React dashboard provides real-time visibility into incidents:
 - **MTTR metrics** — resolution rate, average time to resolve, throughput
 
 ```bash
-# Development mode
+# Development mode (dashboard on http://localhost:3000)
 cd dashboard && npm install && npm run dev
 
-# Production (served via nginx in Docker)
+# Production (served via nginx in Docker on http://localhost:8081)
 docker-compose up --build
 ```
 
