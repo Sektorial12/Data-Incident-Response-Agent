@@ -100,7 +100,7 @@ cp .env.example .env
 # Install
 pip install -e .
 
-# Run tests (92 tests)
+# Run tests (126 tests)
 python -m pytest tests/ -v
 
 # Start the agent (launches DataHub Actions listener)
@@ -126,6 +126,45 @@ docker run --rm --network host \
 
 `--network host` is needed so the container can reach DataHub on localhost.
 
+### Docker Compose (Agent + Dashboard)
+
+```bash
+# Build and run both agent and dashboard
+docker-compose up --build
+
+# Dashboard available at http://localhost:8081
+# API available at http://localhost:8000
+```
+
+### Dashboard
+
+A React dashboard provides real-time visibility into incidents:
+
+- **Incident feed** — live list of active/resolved incidents with confidence bars
+- **Agent pipeline timeline** — Tracer -> Checker -> Notifier -> Reporter with status
+- **Root cause visualization** — ranked candidates with confidence levels
+- **MTTR metrics** — resolution rate, average time to resolve, throughput
+
+```bash
+# Development mode
+cd dashboard && npm install && npm run dev
+
+# Production (served via nginx in Docker)
+docker-compose up --build
+```
+
+The dashboard polls the agent's FastAPI server at `/incidents`, `/stats`, and `/health`.
+
+### API Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /health` | Liveness probe with uptime |
+| `GET /metrics` | Prometheus-style metrics (incidents, agent duration, LLM calls) |
+| `GET /incidents?status=active&limit=50` | List incidents, optionally filtered by status |
+| `GET /incidents/{id}` | Single incident detail with agent results and root causes |
+| `GET /stats` | Aggregate metrics (total, active, resolved, avg MTTR) |
+
 ## Configuration
 
 ### `.env` file
@@ -137,10 +176,13 @@ docker run --rm --network host \
 | `DATAHUB_ACCESS_TOKEN` | yes | Personal access token |
 | `DATAHUB_SERVICE_ACCOUNT_TOKEN` | yes | Service account token for MCP server |
 | `TOOLS_IS_MUTATION_ENABLED` | yes | Must be `true` for write-back (tags, documents) |
-| `SLACK_WEBHOOK_URL` | no | Slack incoming webhook for alerts |
+| `SLACK_WEBHOOK_URL` | no | Slack incoming webhook for alerts (default route) |
+| `SLACK_CRITICAL_WEBHOOK_URL` | no | Slack webhook for critical platform alerts (routing) |
+| `SLACK_HIGH_PRIORITY_WEBHOOK_URL` | no | Slack webhook for high-confidence incidents (routing) |
 | `ANTHROPIC_API_KEY` | no | Anthropic API key (highest priority) |
 | `OPENAI_API_KEY` | no | OpenAI API key |
 | `GOOGLE_API_KEY` | no | Google Gemini API key (lowest priority) |
+| `API_PORT` | no | Port for API server (default: 8000) |
 
 ### Config files
 
@@ -161,7 +203,7 @@ docker run --rm --network host \
 ## Testing
 
 ```bash
-# Run all 92 tests
+# Run all 126 tests
 python -m pytest tests/ -v
 
 # Run specific agent tests
@@ -180,6 +222,9 @@ Test coverage:
 - **LLM Integration** (13 tests) — Model-agnostic client, heuristic fallback, confidence adjustment
 - **Edge Cases** (9 tests) — Retry/timeout, update_description, malformed events, empty lineage
 - **Skills Loader** (6 tests) — DataHub skill guidance loading, prompt augmentation, fallback
+- **Incident Store** (13 tests) — SQLite persistence, save/update/list, dedup lookup, metrics
+- **API Server** (10 tests) — Health, metrics, incidents list/filter, stats, dedup integration
+- **Alert Router** (11 tests) — Platform/confidence matching, env var resolution, edge cases
 
 ## License
 

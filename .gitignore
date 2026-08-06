@@ -42,3 +42,7 @@ Thumbs.db
 
 # Local only
 roadmap.md
+
+# Dashboard
+dashboard/node_modules/
+dashboard/dist/

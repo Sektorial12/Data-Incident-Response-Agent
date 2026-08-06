@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    border-color: theme("colors.border");
+  }
+  body {
+    background-color: theme("colors.canvas");
+    color: theme("colors.ink.primary");
+    font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+    font-feature-settings: "tnum";
+  }
+}
+
+@layer utilities {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: oklch(100% 0 0 / 0.1) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: oklch(100% 0 0 / 0.1);
+    border-radius: 3px;
+  }
+}
