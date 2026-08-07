@@ -78,6 +78,11 @@ If no API key is set, agents fall back to heuristic-only mode (still functional,
    cd datahub
    docker compose -p datahub -f docker-compose.yml -f docker-compose.quickstart.yml up -d
    ```
+   This creates the quickstart files in `~/.datahub/quickstart/`. To restart later:
+   ```bash
+   cd ~/.datahub/quickstart
+   docker compose -p datahub --profile quickstart up -d
+   ```
    - GMS on `http://localhost:8080`
    - Frontend on `http://localhost:9002`
    - Kafka on `localhost:9092`

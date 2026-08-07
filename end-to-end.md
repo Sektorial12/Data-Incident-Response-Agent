@@ -13,6 +13,12 @@ Full walkthrough of the Data Incident Response Agent — from infrastructure set
   - Frontend on `http://localhost:9002`
   - Kafka on `localhost:9092`
   - Schema registry served by GMS at `http://localhost:8080/schema-registry/api/`
+
+```bash
+cd ~/.datahub/quickstart
+docker compose -p datahub --profile quickstart up -d
+```
+
 - **Python 3.11+** with virtualenv at `code/.venv`
 - **Node.js 18+** for the dashboard (dev mode)
 
@@ -62,7 +68,9 @@ raw_patients -> staging_patients -> mart_billing
 ```
 
 ```bash
-cd code/scripts/data
+cd code
+source .venv/bin/activate
+cd scripts/data
 
 # Ingest tables into DataHub
 datahub ingest -c ingest.yaml
@@ -77,13 +85,20 @@ python add_metadata.py
 python create_assertions.py
 ```
 
-### Verify in DataHub UI
+### Verify via API or DataHub UI
 
-1. Open `http://localhost:9002`
-2. Search for `mart_billing` — confirm dataset exists with lineage tab showing upstream chain
-3. Search for `mart_demographics` — confirm dataset exists with lineage tab
-4. Click on `mart_billing` > Assertions tab — confirm `billingAmountPositive` assertion exists
-5. Click on `mart_demographics` > Assertions tab — confirm `patientNameNotNull` and `ageValidRange` assertions exist
+```bash
+# List all assertions via the agent API
+curl http://localhost:8000/manage/assertions | python3 -m json.tool
+
+# Or search DataHub directly
+curl -s http://localhost:8080/api/graphql \
+  -H "Content-Type: application/json" \
+  -d '{"query":"{searchAcrossEntities(input:{types:[DATASET],query:\"mart_billing\",start:0,count:5}){searchResults{entity{urn type}}}}"}' \
+  | python3 -m json.tool
+```
+
+Alternatively, open `http://localhost:9002` and search for `mart_billing` to confirm the dataset exists with its lineage tab showing the upstream chain.
 
 ---
 
@@ -153,15 +168,16 @@ The dashboard is available at `http://localhost:3000`.
 ### Verify via API
 
 ```bash
+# List all assertions via the agent API
 curl http://localhost:8000/manage/assertions | python3 -m json.tool
 # Should list all assertions including the one you just created
+
+# Or query DataHub GraphQL directly
+curl -s http://localhost:8080/api/graphql \
+  -H "Content-Type: application/json" \
+  -d '{"query":"{searchAcrossEntities(input:{types:[ASSERTION],query:\"*\",start:0,count:50}){searchResults{entity{urn type}}}}"}' \
+  | python3 -m json.tool
 ```
-
-### Verify in DataHub UI
-
-1. Open `http://localhost:9002`
-2. Search for `mart_billing` > Assertions tab
-3. Confirm the new assertion appears
 
 ---
 
