@@ -39,7 +39,7 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
     <button
       onClick={onClick}
       className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
-        active ? "border-blue text-ink-primary" : "border-transparent text-ink-tertiary hover:text-ink-secondary"
+        active ? "border-primary text-primary" : "border-transparent text-ink-tertiary hover:text-ink-secondary"
       }`}
     >
       {children}
@@ -75,12 +75,12 @@ function AssertionsTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold">DataHub Assertions</h3>
+        <h3 className="text-sm font-semibold text-ink-primary">DataHub Assertions</h3>
         <div className="flex gap-2">
           <button onClick={refetch} className="p-1.5 hover:bg-surface-hover rounded">
             <RefreshCw className="w-3.5 h-3.5" />
           </button>
-          <button onClick={() => setShowCreate(!showCreate)} className="flex items-center gap-1 px-2 py-1 text-xs bg-blue text-white rounded hover:opacity-90">
+          <button onClick={() => setShowCreate(!showCreate)} className="flex items-center gap-1 px-2 py-1 text-xs bg-primary text-white rounded hover:bg-primary-hover">
             <Plus className="w-3 h-3" /> New
           </button>
         </div>
@@ -92,7 +92,7 @@ function AssertionsTab() {
 
       <div className="space-y-1.5">
         {data?.assertions.map((a) => (
-          <div key={a.urn} className="border border-border rounded p-3 text-xs">
+          <div key={a.urn} className="border border-border rounded p-3 text-xs bg-white">
             <div className="font-mono text-ink-primary break-all">{a.urn}</div>
             <div className="text-ink-tertiary mt-1">
               {a.type} &middot; {a.operator || "—"}
@@ -100,7 +100,7 @@ function AssertionsTab() {
             {a.dataset && <div className="text-ink-tertiary font-mono mt-0.5 break-all">{a.dataset}</div>}
             <button
               onClick={() => { setTriggerUrn(a.urn); setTriggerDataset(a.dataset); }}
-              className="mt-2 flex items-center gap-1 px-2 py-1 text-2xs bg-amber/20 text-amber rounded hover:bg-amber/30"
+              className="mt-2 flex items-center gap-1 px-2 py-1 text-2xs bg-amber-subtle text-amber border border-amber-border rounded hover:opacity-80"
             >
               <Zap className="w-3 h-3" /> Trigger Failure
             </button>
@@ -112,25 +112,25 @@ function AssertionsTab() {
       </div>
 
       {(triggerUrn || msg) && (
-        <div className="border border-border rounded p-3 space-y-2">
-          <div className="text-xs font-semibold">Trigger Test Failure</div>
+        <div className="border border-border rounded p-3 space-y-2 bg-white">
+          <div className="text-xs font-semibold text-ink-primary">Trigger Test Failure</div>
           <input
             value={triggerUrn}
             onChange={(e) => setTriggerUrn(e.target.value)}
             placeholder="Assertion URN"
-            className="w-full text-xs font-mono bg-surface border border-border rounded px-2 py-1"
+            className="w-full text-xs font-mono bg-white border border-border rounded px-2 py-1 text-ink-primary"
           />
           <input
             value={triggerDataset}
             onChange={(e) => setTriggerDataset(e.target.value)}
             placeholder="Dataset URN"
-            className="w-full text-xs font-mono bg-surface border border-border rounded px-2 py-1"
+            className="w-full text-xs font-mono bg-white border border-border rounded px-2 py-1 text-ink-primary"
           />
           <div className="flex gap-2">
             <button
               onClick={handleTrigger}
               disabled={busy}
-              className="flex items-center gap-1 px-3 py-1 text-xs bg-amber text-white rounded hover:opacity-90 disabled:opacity-50"
+              className="flex items-center gap-1 px-3 py-1 text-xs bg-amber text-white rounded hover:opacity-90 disabled:opacity-50 border border-amber-border"
             >
               <Zap className="w-3 h-3" /> {busy ? "Sending..." : "Emit Failure"}
             </button>
@@ -166,18 +166,18 @@ function CreateAssertionForm({ onDone }: { onDone: () => void }) {
   };
 
   return (
-    <div className="border border-border rounded p-3 space-y-2 mb-3">
-      <div className="text-xs font-semibold">Create Assertion</div>
-      <input value={id} onChange={(e) => setId(e.target.value)} placeholder="Assertion ID (e.g. billingPositive)" className="w-full text-xs bg-surface border border-border rounded px-2 py-1" />
-      <input value={datasetUrn} onChange={(e) => setDatasetUrn(e.target.value)} placeholder="Dataset URN" className="w-full text-xs font-mono bg-surface border border-border rounded px-2 py-1" />
-      <select value={op} onChange={(e) => setOp(e.target.value)} className="w-full text-xs bg-surface border border-border rounded px-2 py-1">
+    <div className="border border-border rounded p-3 space-y-2 mb-3 bg-white">
+      <div className="text-xs font-semibold text-ink-primary">Create Assertion</div>
+      <input value={id} onChange={(e) => setId(e.target.value)} placeholder="Assertion ID (e.g. billingPositive)" className="w-full text-xs bg-white border border-border rounded px-2 py-1 text-ink-primary" />
+      <input value={datasetUrn} onChange={(e) => setDatasetUrn(e.target.value)} placeholder="Dataset URN" className="w-full text-xs font-mono bg-white border border-border rounded px-2 py-1 text-ink-primary" />
+      <select value={op} onChange={(e) => setOp(e.target.value)} className="w-full text-xs bg-white border border-border rounded px-2 py-1 text-ink-primary">
         <option value="EQUAL_TO">EQUAL_TO</option>
         <option value="NOT_EQUAL_TO">NOT_EQUAL_TO</option>
         <option value="GREATER_THAN">GREATER_THAN</option>
         <option value="LESS_THAN">LESS_THAN</option>
       </select>
       <div className="flex gap-2">
-        <button onClick={handleCreate} disabled={busy} className="px-3 py-1 text-xs bg-blue text-white rounded hover:opacity-90 disabled:opacity-50">
+        <button onClick={handleCreate} disabled={busy} className="px-3 py-1 text-xs bg-primary text-white rounded hover:bg-primary-hover disabled:opacity-50">
           {busy ? "Creating..." : "Create"}
         </button>
         <button onClick={onDone} className="px-3 py-1 text-xs text-ink-tertiary">Cancel</button>
@@ -226,13 +226,13 @@ function ConfigTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold">Configuration</h3>
+        <h3 className="text-sm font-semibold text-ink-primary">Configuration</h3>
         <div className="flex gap-2 items-center">
           {saveMsg && <span className="text-2xs text-ink-tertiary">{saveMsg}</span>}
           <button onClick={refetch} className="p-1.5 hover:bg-surface-hover rounded">
             <RefreshCw className="w-3.5 h-3.5" />
           </button>
-          <button onClick={save} disabled={!dirty || busy} className="flex items-center gap-1 px-2 py-1 text-xs bg-blue text-white rounded hover:opacity-90 disabled:opacity-50">
+          <button onClick={save} disabled={!dirty || busy} className="flex items-center gap-1 px-2 py-1 text-xs bg-primary text-white rounded hover:bg-primary-hover disabled:opacity-50">
             <Save className="w-3 h-3" /> Save
           </button>
         </div>
@@ -255,14 +255,14 @@ function ConfigTab() {
               <input
                 value={defaultWebhook}
                 onChange={(e) => { setDefaultWebhook(e.target.value); setDirty(true); }}
-                className="w-full text-xs font-mono bg-surface border border-border rounded px-2 py-1"
+                className="w-full text-xs font-mono bg-white border border-border rounded px-2 py-1 text-ink-primary"
               />
               <label className="text-2xs text-ink-tertiary">Dedup Window (seconds)</label>
               <input
                 type="number"
                 value={dedup}
                 onChange={(e) => { setDedup(Number(e.target.value)); setDirty(true); }}
-                className="w-24 text-xs bg-surface border border-border rounded px-2 py-1"
+                className="w-24 text-xs bg-white border border-border rounded px-2 py-1 text-ink-primary"
               />
             </div>
           </Section>
@@ -270,23 +270,23 @@ function ConfigTab() {
           <Section title={`Routing Rules (${rules.length})`}>
             <div className="space-y-2">
               {rules.map((rule, i) => (
-                <div key={i} className="border border-border rounded p-2 space-y-1">
+                <div key={i} className="border border-border rounded p-2 space-y-1 bg-white">
                   <input
                     value={rule.name}
                     onChange={(e) => { const r = [...rules]; r[i] = { ...r[i], name: e.target.value }; setRules(r); setDirty(true); }}
-                    className="w-full text-xs bg-surface border border-border rounded px-2 py-1"
+                    className="w-full text-xs bg-white border border-border rounded px-2 py-1 text-ink-primary"
                   />
                   <input
                     value={(rule.match.platform || []).join(", ")}
                     onChange={(e) => { const r = [...rules]; r[i] = { ...r[i], match: { ...r[i].match, platform: e.target.value.split(",").map(s => s.trim()).filter(Boolean) } }; setRules(r); setDirty(true); }}
                     placeholder="platforms (comma-separated)"
-                    className="w-full text-xs bg-surface border border-border rounded px-2 py-1"
+                    className="w-full text-xs bg-white border border-border rounded px-2 py-1 text-ink-primary"
                   />
                   <input
                     value={rule.webhook_url}
                     onChange={(e) => { const r = [...rules]; r[i] = { ...r[i], webhook_url: e.target.value }; setRules(r); setDirty(true); }}
                     placeholder="webhook URL or ${ENV_VAR}"
-                    className="w-full text-xs font-mono bg-surface border border-border rounded px-2 py-1"
+                    className="w-full text-xs font-mono bg-white border border-border rounded px-2 py-1 text-ink-primary"
                   />
                   <button
                     onClick={() => { setRules(rules.filter((_, j) => j !== i)); setDirty(true); }}
@@ -298,7 +298,7 @@ function ConfigTab() {
               ))}
               <button
                 onClick={() => { setRules([...rules, { name: "New Rule", match: {}, webhook_url: "" }]); setDirty(true); }}
-                className="flex items-center gap-1 text-xs text-blue hover:underline"
+                className="flex items-center gap-1 text-xs text-primary hover:underline"
               >
                 <Plus className="w-3 h-3" /> Add Rule
               </button>
@@ -312,8 +312,8 @@ function ConfigTab() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="border border-border rounded p-3">
-      <div className="text-2xs text-ink-tertiary uppercase tracking-wider mb-2">{title}</div>
+    <div className="border border-border rounded p-3 bg-white">
+      <div className="text-2xs text-primary uppercase tracking-wider mb-2 font-medium">{title}</div>
       <div className="space-y-1">{children}</div>
     </div>
   );
@@ -365,12 +365,12 @@ function AgentTab() {
 
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-semibold">Agent Lifecycle</h3>
+      <h3 className="text-sm font-semibold text-ink-primary">Agent Lifecycle</h3>
 
-      <div className="border border-border rounded p-3">
+      <div className="border border-border rounded p-3 bg-white">
         <div className="flex items-center gap-2 mb-2">
           <div className={`w-2 h-2 rounded-full ${data?.status === "running" ? "bg-green" : "bg-red"}`} />
-          <span className="text-sm font-medium">{data?.status || "..."}</span>
+          <span className="text-sm font-medium text-ink-primary">{data?.status || "..."}</span>
         </div>
         {data && (
           <div className="space-y-1">
@@ -384,7 +384,7 @@ function AgentTab() {
         <button
           onClick={restart}
           disabled={busy}
-          className="flex items-center gap-1 px-3 py-1.5 text-xs bg-blue text-white rounded hover:opacity-90 disabled:opacity-50"
+          className="flex items-center gap-1 px-3 py-1.5 text-xs bg-primary text-white rounded hover:bg-primary-hover disabled:opacity-50"
         >
           <Play className="w-3 h-3" /> Restart
         </button>

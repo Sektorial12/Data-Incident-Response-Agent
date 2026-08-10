@@ -30,7 +30,7 @@ export function StatsBar({
   const mttrTrend = stats.avg_mttr_seconds > 0 && stats.avg_mttr_seconds < 30;
 
   return (
-    <div className="px-6 py-2.5 border-b border-border flex items-center gap-8">
+    <div className="px-6 py-3 border-b border-border flex items-center gap-8 bg-white">
       <Metric
         label="Resolution Rate"
         value={`${resolutionRate}%`}

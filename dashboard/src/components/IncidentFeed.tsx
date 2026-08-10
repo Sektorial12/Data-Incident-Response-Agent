@@ -38,7 +38,7 @@ export function IncidentFeed({
 
   return (
     <div>
-      <div className="px-4 py-2.5 border-b border-border flex items-center justify-between">
+      <div className="px-4 py-3 border-b border-border flex items-center justify-between bg-surface-alt">
         <span className="text-2xs uppercase tracking-wider text-ink-tertiary font-medium">
           Incident Feed
         </span>
@@ -79,7 +79,7 @@ function IncidentRow({
     <button
       onClick={() => onSelect(incident)}
       className={`w-full text-left px-4 py-3 border-b border-border transition-colors ${
-        selected ? "bg-elevated" : "hover:bg-surface"
+        selected ? "bg-primary-subtle" : "hover:bg-surface-hover"
       }`}
     >
       <div className="flex items-start gap-2.5">
@@ -92,12 +92,12 @@ function IncidentRow({
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium truncate">{datasetName}</span>
+            <span className="text-sm font-medium text-ink-primary truncate">{datasetName}</span>
             <span
-              className={`text-2xs px-1.5 py-0.5 rounded tabular uppercase tracking-wider ${
+              className={`text-2xs px-1.5 py-0.5 rounded tabular uppercase tracking-wider border ${
                 isActive
-                  ? "bg-amber-subtle text-amber"
-                  : "bg-green-subtle text-green"
+                  ? "bg-amber-subtle text-amber border-amber-border"
+                  : "bg-green-subtle text-green border-green-border"
               }`}
             >
               {incident.status}
@@ -119,7 +119,7 @@ function IncidentRow({
               </span>
               <div className="flex-1 h-1 bg-border rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-blue rounded-full"
+                  className="h-full bg-primary rounded-full"
                   style={{ width: `${maxConfidence * 100}%` }}
                 />
               </div>

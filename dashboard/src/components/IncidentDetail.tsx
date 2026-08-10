@@ -20,10 +20,10 @@ export function IncidentDetail({ incident }: { incident: Incident }) {
     <div className="p-6 max-w-4xl">
       <div className="flex items-center gap-2 mb-1">
         <span
-          className={`text-2xs px-1.5 py-0.5 rounded tabular uppercase tracking-wider ${
+          className={`text-2xs px-1.5 py-0.5 rounded tabular uppercase tracking-wider border ${
             incident.status === "active"
-              ? "bg-amber-subtle text-amber"
-              : "bg-green-subtle text-green"
+              ? "bg-amber-subtle text-amber border-amber-border"
+              : "bg-green-subtle text-green border-green-border"
           }`}
         >
           {incident.status}
@@ -35,7 +35,7 @@ export function IncidentDetail({ incident }: { incident: Incident }) {
         )}
       </div>
 
-      <h1 className="text-xl font-semibold tracking-tight mb-1">{datasetName}</h1>
+      <h1 className="text-xl font-semibold tracking-tight text-ink-primary mb-1">{datasetName}</h1>
       <p className="text-sm text-ink-secondary font-mono mb-4">
         {incident.dataset_urn}
       </p>
@@ -64,7 +64,7 @@ export function IncidentDetail({ incident }: { incident: Incident }) {
 
       {incident.agent_results && (
         <section className="mb-6">
-          <h2 className="text-2xs uppercase tracking-wider text-ink-tertiary font-medium mb-3">
+          <h2 className="text-2xs uppercase tracking-wider text-primary font-medium mb-3">
             Agent Pipeline
           </h2>
           <AgentTimeline results={incident.agent_results} />
@@ -73,7 +73,7 @@ export function IncidentDetail({ incident }: { incident: Incident }) {
 
       {incident.root_causes && incident.root_causes.length > 0 && (
         <section className="mb-6">
-          <h2 className="text-2xs uppercase tracking-wider text-ink-tertiary font-medium mb-3">
+          <h2 className="text-2xs uppercase tracking-wider text-primary font-medium mb-3">
             Root Causes ({incident.root_causes.length})
           </h2>
           <RootCauseList causes={incident.root_causes} />
@@ -81,10 +81,10 @@ export function IncidentDetail({ incident }: { incident: Incident }) {
       )}
 
       <section>
-        <h2 className="text-2xs uppercase tracking-wider text-ink-tertiary font-medium mb-3">
+        <h2 className="text-2xs uppercase tracking-wider text-primary font-medium mb-3">
           Raw Data
         </h2>
-        <pre className="text-2xs font-mono text-ink-secondary bg-surface rounded-lg p-4 overflow-x-auto scrollbar-thin border border-border">
+        <pre className="text-2xs font-mono text-ink-secondary bg-surface-alt rounded-lg p-4 overflow-x-auto scrollbar-thin border border-border">
           {JSON.stringify(incident, null, 2)}
         </pre>
       </section>

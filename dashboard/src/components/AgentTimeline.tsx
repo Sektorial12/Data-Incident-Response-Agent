@@ -105,26 +105,26 @@ function getStatusConfig(status: string): {
   if (s === "completed" || s === "success" || s === "ok") {
     return {
       bg: "bg-green-subtle",
-      border: "border-green/20",
+      border: "border-green-border",
       color: "text-green",
     };
   }
   if (s === "failed" || s === "error") {
     return {
       bg: "bg-red-subtle",
-      border: "border-red/20",
+      border: "border-red-border",
       color: "text-red",
     };
   }
   if (s === "running" || s === "in_progress") {
     return {
-      bg: "bg-blue-subtle",
-      border: "border-blue/20",
-      color: "text-blue",
+      bg: "bg-primary-subtle",
+      border: "border-primary-border",
+      color: "text-primary",
     };
   }
   return {
-    bg: "bg-surface",
+    bg: "bg-surface-alt",
     border: "border-border",
     color: "text-ink-tertiary",
   };

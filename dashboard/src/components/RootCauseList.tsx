@@ -15,13 +15,13 @@ export function RootCauseList({ causes }: { causes: RootCause[] }) {
         return (
           <div
             key={i}
-            className="rounded-lg border border-border bg-surface px-4 py-3"
+            className="rounded border border-border bg-white px-4 py-3"
           >
             <div className="flex items-center gap-3">
               <span className="text-2xs tabular text-ink-muted w-4">
                 {i + 1}
               </span>
-              <span className="text-sm font-medium flex-1 truncate">
+              <span className="text-sm font-medium text-ink-primary flex-1 truncate">
                 {name}
               </span>
               <span className={`text-2xs uppercase tracking-wider ${level.color}`}>
@@ -35,7 +35,7 @@ export function RootCauseList({ causes }: { causes: RootCause[] }) {
                   style={{ width: `${confidence * 100}%` }}
                 />
               </div>
-              <span className="text-xs tabular font-medium w-10 text-right">
+              <span className="text-xs tabular font-medium w-10 text-right text-ink-primary">
                 {(confidence * 100).toFixed(0)}%
               </span>
             </div>
