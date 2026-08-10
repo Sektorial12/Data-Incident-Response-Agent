@@ -197,6 +197,7 @@ function ConfigTab() {
   const [defaultWebhook, setDefaultWebhook] = useState("");
   const [dedup, setDedup] = useState(900);
   const [dirty, setDirty] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
 
   useEffect(() => {
@@ -220,8 +221,6 @@ function ConfigTab() {
     }
     setBusy(false);
   };
-
-  const [busy, setBusy] = useState(false);
 
   return (
     <div className="space-y-4">

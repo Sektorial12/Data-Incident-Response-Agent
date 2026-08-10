@@ -11,11 +11,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 _SKILLS_BASE = (
-    Path(__file__).resolve().parent.parent.parent.parent
-    / "local"
-    / "knowledge-base"
-    / "repositories"
-    / "datahub-skills"
+    Path(__file__).resolve().parent.parent.parent
     / "skills"
 )
 
